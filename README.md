@@ -1,17 +1,17 @@
 <!-- SHIELDS -->
 <div align="left">
 
-  [![Release](https://img.shields.io/pypi/v/pauli-propagation.svg?label=Release)](https://github.com/Qiskit/pauli-propagation/releases)
+  [![Release](https://img.shields.io/pypi/v/pauli-prop.svg?label=Release)](https://github.com/Qiskit/pauli-prop/releases)
   ![Platform](https://img.shields.io/badge/%F0%9F%92%BB_Platform-Linux%20%7C%20macOS-blue)
-  [![Python](https://img.shields.io/pypi/pyversions/pauli-propagation?label=Python&logo=python)](https://www.python.org/)
+  [![Python](https://img.shields.io/pypi/pyversions/pauli-prop?label=Python&logo=python)](https://www.python.org/)
   [![Qiskit](https://img.shields.io/badge/Qiskit%20-%20%3E%3D1.2%20-%20%236133BD?logo=Qiskit)](https://github.com/Qiskit/qiskit)
 <br />
-  [![Docs (stable)](https://img.shields.io/badge/%F0%9F%93%84%20Docs-stable-blue.svg)](https://qiskit.github.io/pauli-propagation/)
+  [![Docs (stable)](https://img.shields.io/badge/%F0%9F%93%84%20Docs-stable-blue.svg)](https://qiskit.github.io/pauli-prop/)
   <!-- [![DOI](https://zenodo.org/badge/DOI/TODO](https://zenodo.org/doi/TODO -->
-  [![License](https://img.shields.io/github/license/Qiskit/pauli-propagation?label=License)](LICENSE.txt)
-  [![Tests](https://github.com/Qiskit/pauli-propagation/actions/workflows/test_latest_versions.yml/badge.svg)](https://github.com/Qiskit/pauli-propagation/actions/workflows/test_latest_versions.yml)
+  [![License](https://img.shields.io/github/license/Qiskit/pauli-prop?label=License)](LICENSE.txt)
+  [![Tests](https://github.com/Qiskit/pauli-prop/actions/workflows/test_latest_versions.yml/badge.svg)](https://github.com/Qiskit/pauli-prop/actions/workflows/test_latest_versions.yml)
 
-# Pauli propagation
+# Pauli prop
 
 ### Table of contents
 
@@ -33,8 +33,8 @@ evolution of operators in the Pauli basis under the action of other operators, s
 circuit gates and noise channels [1] - [4]. This approach can be effective when the operators
 involved are expected to remain sparse in the Pauli basis. The technique has been used to classically
 estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to
-be run on a quantum processor [5]. Check out the tutorial to learn how to use this package to simulate
-expectation values of quantum systems.
+be run on a quantum processor [5]. To learn how to use this package to simulate expectation values of
+quantum systems, check out the [tutorial](https://github.com/Qiskit/pauli-prop/tree/main/docs/tutorials).
 
 This package provides a Rust-accelerated Python interface for performing the most common Pauli
 propagation routines.
@@ -84,7 +84,7 @@ each operator by descending magnitude then searches the 3D index space for the t
 
 ### Documentation
 
-All documentation is available at https://qiskit.github.io/pauli-propagation/.
+All documentation is available at https://qiskit.github.io/pauli-prop/.
 
 ----------------------------------------------------------------------------------------------------
 
@@ -93,7 +93,7 @@ All documentation is available at https://qiskit.github.io/pauli-propagation/.
 We encourage installing this package via `pip`, when possible:
 
 ```bash
-pip install 'pauli-propagation'
+pip install 'pauli-prop'
 ```
 
 For more installation information refer to these [installation instructions](docs/install.rst).
@@ -108,15 +108,15 @@ We may occasionally make breaking changes in order to improve the user experienc
 When possible, we will keep old interfaces and mark them as deprecated, as long as they can co-exist with the
 new ones.
 Each substantial improvement, breaking change, or deprecation will be documented in the
-[release notes](https://qiskit.github.io/pauli-propagation/release-notes.html).
+[release notes](https://qiskit.github.io/pauli-prop/release-notes.html).
 
 ----------------------------------------------------------------------------------------------------
 
 ### Contributing
 
-The source code is available [on GitHub](https://github.com/Qiskit/pauli-propagation).
+The source code is available [on GitHub](https://github.com/Qiskit/pauli-prop).
 
-The developer guide is located at [CONTRIBUTING.md](https://github.com/Qiskit/pauli-propagation/blob/main/CONTRIBUTING.md)
+The developer guide is located at [CONTRIBUTING.md](https://github.com/Qiskit/pauli-prop/blob/main/CONTRIBUTING.md)
 in the root of this project's repository.
 By participating, you are expected to uphold Qiskit's [code of conduct](https://github.com/Qiskit/qiskit/blob/main/CODE_OF_CONDUCT.md).
 

@@ -1,13 +1,13 @@
 ﻿==================================================
-Propagation (:mod:`pauli_propagation.propagation`)
+Propagation (:mod:`pauli_prop.propagation`)
 ==================================================
 
-.. automodule:: pauli_propagation.propagation
+.. automodule:: pauli_prop.propagation
    :no-members:
    :no-inherited-members:
    :no-special-members:
 
-.. currentmodule:: pauli_propagation.propagation
+.. currentmodule:: pauli_prop.propagation
 
 .. autoclass:: RotationGates
 

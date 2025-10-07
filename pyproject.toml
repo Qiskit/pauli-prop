@@ -3,7 +3,7 @@ requires = ["maturin>=1.0"]
 build-backend = "maturin"
 
 [project]
-name = "pauli-propagation"
+name = "pauli-prop"
 version = "0.0.0"
 readme = "README.md"
 description = "Library for performing Pauli propagation."
@@ -26,6 +26,7 @@ dependencies = [
     "qiskit>=2.1.2, <3",
     "numpy>=1.26",
     "qiskit-ibm-runtime>=0.38",
+    "qiskit-aer>=0.17",
 ]
 
 [tool.maturin]
@@ -33,11 +34,11 @@ manifest-path = "Cargo.toml"
 bindings = "pyo3-abi3-py310"
 features = []
 profile = "release"
-module-name = "pauli_propagation._accelerate"
+module-name = "pauli_prop._accelerate"
 
 [project.optional-dependencies]
 dev = [
-    "pauli-propagation[test,nbtest,lint,docs]",
+    "pauli-prop[test,nbtest,lint,docs]",
     "tox>=4.4.3",
 ]
 basetest = [
@@ -45,10 +46,10 @@ basetest = [
     "pytest-cov>=5.0",
 ]
 test = [
-    "pauli-propagation[basetest]",
+    "pauli-prop[basetest]",
 ]
 nbtest = [
-    "pauli-propagation[basetest]",
+    "pauli-prop[basetest]",
     "nbmake>=1.5.0",
 ]
 style = [
@@ -56,17 +57,17 @@ style = [
     "nbqa>=1.8.5",
 ]
 lint = [
-    "pauli-propagation[style]",
+    "pauli-prop[style]",
     "mypy==1.17.1",
     "pylint==3.3.7",
     "reno>=4.1",
     "toml>=0.9.6",
 ]
 notebook-dependencies = [
-    "pauli-propagation",
+    "pauli-prop",
 ]
 docs = [
-    "pauli-propagation[test,notebook-dependencies]",
+    "pauli-prop[test,notebook-dependencies]",
     "qiskit-sphinx-theme~=2.0.0",
     "matplotlib",
     "jupyter-sphinx",
@@ -88,7 +89,7 @@ show_missing = true
 
 [tool.hatch.build.targets.wheel]
 only-include = [
-    "pauli_propagation",
+    "pauli_prop",
 ]
 
 [tool.hatch.metadata]
@@ -120,11 +121,11 @@ enable = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["./pauli_propagation/", "./test/"]
+testpaths = ["./pauli_prop/", "./test/"]
 
 [tool.ruff]
 line-length = 100
-src = ["pauli_propagation", "test"]
+src = ["pauli_prop", "test"]
 target-version = "py310"
 
 [tool.ruff.lint]
