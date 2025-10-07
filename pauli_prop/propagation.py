@@ -21,13 +21,14 @@ import numpy.typing as npt
 from qiskit.circuit import CircuitInstruction, QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Clifford, Operator, Pauli, PauliList, SparsePauliOp
+from qiskit_aer.noise import PauliLindbladError
+
 from pauli_prop._accelerate import (
     evolve_by_circuit as evolve_by_circuit_r,
 )
 from pauli_prop._accelerate import (
     k_largest_products as k_largest_products_r,
 )
-from qiskit_aer.noise import PauliLindbladError
 
 # We intentionally cast the complex coeffs to real
 warnings.filterwarnings("ignore", category=np.exceptions.ComplexWarning)

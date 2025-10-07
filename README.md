@@ -11,7 +11,7 @@
   [![License](https://img.shields.io/github/license/Qiskit/pauli-prop?label=License)](LICENSE.txt)
   [![Tests](https://github.com/Qiskit/pauli-prop/actions/workflows/test_latest_versions.yml/badge.svg)](https://github.com/Qiskit/pauli-prop/actions/workflows/test_latest_versions.yml)
 
-# Pauli prop
+# Pauli Prop
 
 ### Table of contents
 
@@ -34,7 +34,7 @@ circuit gates and noise channels [1] - [4]. This approach can be effective when 
 involved are expected to remain sparse in the Pauli basis. The technique has been used to classically
 estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to
 be run on a quantum processor [5]. To learn how to use this package to simulate expectation values of
-quantum systems, check out the [tutorial](https://github.com/Qiskit/pauli-prop/tree/main/docs/tutorials).
+quantum systems, check out the [tutorial](https://github.com/Qiskit/pauli-prop/tree/main/docs/tutorials/simulate_kicked_ising.ipynb).
 
 This package provides a Rust-accelerated Python interface for performing the most common Pauli
 propagation routines.
@@ -43,12 +43,12 @@ propagation routines.
 
 - ``propagate_through_rotation_gates``: Evolve an operator specified in the Pauli basis, $O$, through a
 sequence of Pauli rotation gates, $P$, creating a transformed operator, $\tilde{O}$. This evolution
-can be done in either the Heisenberg frame ($\tilde{O} = P^{\dagger}OP$) or the Schrödinger frame
-($\tilde{O} = POP^{\dagger}$).
+can be done in either the Heisenberg ($\tilde{O} = P^{\dagger}OP$) or Schrödinger ($\tilde{O} = POP^{\dagger}$)
+framework.
 - ``propagate_through_operator``: Evolve an operator specified in the Pauli basis, $O$, through
 another such operator, $G$, creating a transformed operator, $\tilde{O}$. This evolution can be done
-in either the Heisenberg frame ($\tilde{O} = G^{\dagger}OG$) or the Schrödinger frame
-($\tilde{O} = GOG^{\dagger}$).
+in either the Heisenberg ($\tilde{O} = G^{\dagger}OG$) or Schrödinger ($\tilde{O} = GOG^{\dagger}$)
+framework.
 - ``evolve_through_cliffords``: Separate a quantum circuit, $U$, into Clifford and non-Clifford
 parts, $C$ and $P$ respectively, such that $U = PC$.
 
@@ -57,9 +57,9 @@ parts, $C$ and $P$ respectively, such that $U = PC$.
 - Rust-accelerated Python interface
 - Ability to truncate terms from $\tilde{O}$ during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
-- Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frames.
+- Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
 - Novel technique for approximating the conjugation of a Pauli-sum operator, $O$, by another such
-operator, $G$, e.g. $GOG^{\dagger}$ or $G^{\dagger}OG$. This heuristic implementation greedily
+operator, $G$ ($GOG^{\dagger}$ or $G^{\dagger}OG$). This heuristic implementation greedily
 generates contributions to the product expected to be most significant.
 
 ##### Computational requirements
