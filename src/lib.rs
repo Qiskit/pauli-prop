@@ -169,7 +169,7 @@ fn evolve_by_circuit(
     let mut trunc_onenorm = 0.0;
     // Release the GIL and evolve the operator through the circuit
     let num_gates = thetas.len();
-    py.allow_threads(|| {
+    py.detach(|| {
         for i in 0..num_gates {
             let mut id = i;
             if frame == 'h' {

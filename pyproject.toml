@@ -14,6 +14,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Physics",
@@ -25,14 +26,13 @@ requires-python = ">=3.10"
 dependencies = [
     "qiskit>=2.1.2, <3",
     "numpy>=1.26",
-    "qiskit-ibm-runtime>=0.38",
     "qiskit-aer>=0.17",
 ]
 
 [tool.maturin]
-manifest-path = "Cargo.toml"
-bindings = "pyo3-abi3-py310"
-features = []
+bindings = "pyo3"
+python-source = "python"
+features = ["pyo3/extension-module"]
 profile = "release"
 module-name = "pauli_prop._accelerate"
 
@@ -65,6 +65,8 @@ lint = [
 ]
 notebook-dependencies = [
     "pauli-prop",
+    "matplotlib",
+    "qiskit-ibm-runtime",
 ]
 docs = [
     "pauli-prop[test,notebook-dependencies]",
