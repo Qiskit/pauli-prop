@@ -14,3 +14,21 @@
 # If we ever publicly expose interfaces users can import from this module,
 # we should set up its RST file.
 """Primary Pauli propagation functionality."""
+
+from .propagation import (
+    RotationGates,
+    circuit_to_rotation_gates,
+    evolve_through_cliffords,
+    propagate_through_circuit,
+    propagate_through_operator,
+    propagate_through_rotation_gates,
+)
+
+__all__ = [
+    "RotationGates",
+    "circuit_to_rotation_gates",
+    "evolve_through_cliffords",
+    "propagate_through_circuit",
+    "propagate_through_operator",
+    "propagate_through_rotation_gates",
+]
