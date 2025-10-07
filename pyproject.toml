@@ -26,7 +26,6 @@ requires-python = ">=3.10"
 dependencies = [
     "qiskit>=2.1.2, <3",
     "numpy>=1.26",
-    "qiskit-ibm-runtime>=0.38",
     "qiskit-aer>=0.17",
 ]
 
@@ -67,6 +66,7 @@ lint = [
 notebook-dependencies = [
     "pauli-prop",
     "matplotlib",
+    "qiskit-ibm-runtime",
 ]
 docs = [
     "pauli-prop[test,notebook-dependencies]",
