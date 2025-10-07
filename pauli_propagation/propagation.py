@@ -488,8 +488,6 @@ def propagate_through_operator(
             paulis_each_term, coeffs_each_term, ignore_pauli_phase=False, copy=False
         )
 
-        # assert np.all(kept_idx[:, 0] <= kept_idx[:, 2])
-        # assert np.all(product.paulis.phase == 0)
         off_diag = kept_idx[:, 0] != kept_idx[:, 2]
         product.coeffs[off_diag] = 2 * product.coeffs[off_diag].real
 
