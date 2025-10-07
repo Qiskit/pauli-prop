@@ -25,7 +25,7 @@ project_copyright = "2025, Qiskit addons team"
 description = "Library for performing Pauli Propagation"
 author = "Qiskit addons team"
 language = "en"
-release = metadata_version("pauli-propagation")
+release = metadata_version("pauli-prop")
 
 html_theme = "qiskit-ecosystem"
 
@@ -81,7 +81,7 @@ autodoc_default_options = {
     "inherited-members": None,
     "show-inheritance": True,
 }
-autodoc_mock_imports = ["pauli_propagation._accelerate"]
+autodoc_mock_imports = ["pauli_prop._accelerate"]
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
 
@@ -96,7 +96,7 @@ nbsphinx_execute = "never"
 
 add_module_names = False
 
-modindex_common_prefix = ["pauli_propagation."]
+modindex_common_prefix = ["pauli_prop."]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -113,16 +113,16 @@ plot_html_show_source_link = False
 # ----------------------------------------------------------------------------------
 
 _inlined_apis = [
-    ("pauli_propagation.propagation", "RotationGates"),
-    ("pauli_propagation.propagation", "evolve_through_cliffords"),
-    ("pauli_propagation.propagation", "circuit_to_rotation_gates"),
-    ("pauli_propagation.propagation", "propagate_through_rotation_gates"),
-    ("pauli_propagation.propagation", "propagate_through_circuit"),
-    ("pauli_propagation.propagation", "propagate_through_operator"),
+    ("pauli_prop.propagation", "RotationGates"),
+    ("pauli_prop.propagation", "evolve_through_cliffords"),
+    ("pauli_prop.propagation", "circuit_to_rotation_gates"),
+    ("pauli_prop.propagation", "propagate_through_rotation_gates"),
+    ("pauli_prop.propagation", "propagate_through_circuit"),
+    ("pauli_prop.propagation", "propagate_through_operator"),
 ]
 
 redirects = {
-    "apidocs/pauli_propagation": "./index.html",
+    "apidocs/pauli_prop": "./index.html",
     **{
         f"stubs/{module}.{name}": f"../apidocs/{module}.html#{module}.{name}"
         for module, name in _inlined_apis
@@ -166,7 +166,7 @@ def linkcode_resolve(domain, info):
 
     module_name = info["module"]
     module = sys.modules.get(module_name)
-    if module is None or "pauli_propagation" not in module_name:
+    if module is None or "pauli_prop" not in module_name:
         return None
 
     def is_valid_code_object(obj):
@@ -191,9 +191,9 @@ def linkcode_resolve(domain, info):
         full_file_name = inspect.getsourcefile(obj)
     except TypeError:
         return None
-    if full_file_name is None or "/pauli_propagation/" not in full_file_name:
+    if full_file_name is None or "/pauli_prop/" not in full_file_name:
         return None
-    file_name = full_file_name.split("/pauli_propagation/")[-1]
+    file_name = full_file_name.split("/pauli_prop/")[-1]
 
     try:
         source, lineno = inspect.getsourcelines(obj)
@@ -202,4 +202,4 @@ def linkcode_resolve(domain, info):
     else:
         ending_lineno = lineno + len(source) - 1
         linespec = f"#L{lineno}-L{ending_lineno}"
-    return f"https://github.com/Qiskit/pauli-propagation/tree/{GITHUB_BRANCH}/pauli_propagation/{file_name}{linespec}"
+    return f"https://github.com/Qiskit/pauli-prop/tree/{GITHUB_BRANCH}/pauli_prop/{file_name}{linespec}"
