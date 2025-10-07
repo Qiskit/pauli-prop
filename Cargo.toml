@@ -1,5 +1,5 @@
 [package]
-name = "pauli_propagation_accelerate"
+name = "pauli_prop_accelerate"
 version = "0.0.0"
 edition = "2024"
 

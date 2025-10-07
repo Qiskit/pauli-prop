@@ -1,8 +1,8 @@
 ***********************************
-``pauli-propagation`` API reference
+``pauli-prop`` API reference
 ***********************************
 
 .. toctree::
    :maxdepth: 1
 
-   pauli_propagation.propagation
+   pauli_prop.propagation
