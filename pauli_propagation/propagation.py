@@ -163,11 +163,16 @@ class RotationGates(NamedTuple):
             inst: The circuit instruction to parse and append
             qargs: The list of qubit indices of the instruction in the context of its circuit
             num_qubits: The number of qubits of the circuit containing this instruction
-            clifford: An optional Clifford through which the provided instruction should be moved
+            clifford: An optional Clifford through which the provided instruction should be moved.
+                The Clifford must act on all qubits in the circuit.
 
         Raises:
-            ValueError: Unsupported gate encountered in ``circuit``
+            ValueError: Unsupported gate encountered in circuit
+            ValueError: If given, ``clifford`` must act on all qubits in circuit
         """
+        if (clifford is not None) and (clifford.num_qubits != num_qubits):
+            raise ValueError("Clifford must act on all qubits in circuit.")
+
         theta = inst.operation.params[0]
         if not isinstance(inst.operation, PauliEvolutionGate):
             if inst.name not in _ROTATION_TO_GENERATOR:
@@ -181,21 +186,17 @@ class RotationGates(NamedTuple):
             rotation_pauli = inst.operation.operator.paulis[0]
             theta *= 2.0
 
+        rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
+
         if clifford is not None:
-            rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=clifford.num_qubits)
             rotation_pauli = rotation_pauli.evolve(clifford, frame="s")
             if rotation_pauli.phase == 2:
                 theta *= -1
                 rotation_pauli.phase = 0
-            qargs = np.where(rotation_pauli.z | rotation_pauli.x)[0].tolist()
-            rotation_pauli = rotation_pauli[qargs]
 
         assert rotation_pauli.phase == 0
 
-        gate_arr = np.zeros(2 * num_qubits, dtype=bool)
-        for i, q in enumerate(qargs):
-            gate_arr[q] = rotation_pauli.x[i]
-            gate_arr[num_qubits + q] = rotation_pauli.z[i]
+        gate_arr = np.concatenate((rotation_pauli.x, rotation_pauli.z))
 
         self.gates.append(gate_arr)
         self.qargs.append(qargs)
