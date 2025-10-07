@@ -1,30 +1,4 @@
-<!-- SHIELDS -->
-<div align="left">
-
-  [![Release](https://img.shields.io/pypi/v/pauli-prop.svg?label=Release)](https://github.com/Qiskit/pauli-prop/releases)
-  ![Platform](https://img.shields.io/badge/%F0%9F%92%BB_Platform-Linux%20%7C%20macOS-blue)
-  [![Python](https://img.shields.io/pypi/pyversions/pauli-prop?label=Python&logo=python)](https://www.python.org/)
-  [![Qiskit](https://img.shields.io/badge/Qiskit%20-%20%3E%3D1.2%20-%20%236133BD?logo=Qiskit)](https://github.com/Qiskit/qiskit)
-<br />
-  [![Docs (stable)](https://img.shields.io/badge/%F0%9F%93%84%20Docs-stable-blue.svg)](https://qiskit.github.io/pauli-prop/)
-  <!-- [![DOI](https://zenodo.org/badge/DOI/TODO](https://zenodo.org/doi/TODO -->
-  [![License](https://img.shields.io/github/license/Qiskit/pauli-prop?label=License)](LICENSE.txt)
-  [![Tests](https://github.com/Qiskit/pauli-prop/actions/workflows/test_latest_versions.yml/badge.svg)](https://github.com/Qiskit/pauli-prop/actions/workflows/test_latest_versions.yml)
-
 # Pauli Prop
-
-### Table of contents
-
-* [About](#about)
-* [Documentation](#documentation)
-* [Installation](#installation)
-* [Computational requirements](#computational-requirements)
-* [Deprecation Policy](#deprecation-policy)
-* [Contributing](#contributing)
-* [License](#license)
-* [References](#references)
-
-----------------------------------------------------------------------------------------------------
 
 ### About
 
