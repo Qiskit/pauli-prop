@@ -373,6 +373,7 @@ def propagate_through_operator(
     num_leading_terms: int = 0,
     frame: str = "s",
     atol: float = 0.0,
+    search_step: int = 4,
 ) -> SparsePauliOp:
     """Propagate an operator, `op1` or :math:`O`, through another operator, `op2` or :math:`U`.
 
@@ -386,6 +387,9 @@ def propagate_through_operator(
 
     Setting `max_terms` produces an approximate result, where only the `max_terms` largest terms (in coefficient magnitude)
     are computed. This can be much faster but results in some error due to truncation of smaller terms.
+
+    The approximate computation involves two parts: searching for the terms to keep, then computing those terms. Increasing
+    ``search_step`` greatly (cubically) speeds up the search, at an accuracy cost that is often small.
 
     It is possible that some Paulis present in the kept terms would have also appeared in the truncated terms. Because such
     truncated terms are never computed, they cannot possibly be merged into the kept terms sharing the same Pauli. Thus, the
@@ -414,12 +418,17 @@ def propagate_through_operator(
             `s` for Schrödinger evolution
             `h` for Heisenberg evolution
         atol: Terms in the evolved operator with magnitudes below ``atol`` will be truncated
+        search_step: A parameter that can speed up the search of the very large 3D space to identify the
+            ``max_terms`` largest terms in the product. Setting this step size >1 accelerates that search by a factor
+            of ``search_step**3``, at a potential cost in accuracy. This inaccuracy is expected to be small for
+            ``search_step**3 << max_terms``.
 
     Returns:
         The transformed operator
 
     Raises:
         ValueError: ``frame`` is neither ``s`` nor ``h``.
+        ValueError: ``search_step`` is not positive.
         ValueError: ``max_terms`` contains an invalid value.
     """
     if frame == "h":
@@ -428,6 +437,8 @@ def propagate_through_operator(
         pass
     else:
         raise ValueError(f"Expected frame either 's' or 'h', but got: {frame}")
+    if search_step < 1:
+        raise ValueError("search_step must be a positive integer.")
 
     num_leads = min(num_leading_terms, len(op1))
     if max_terms is not None:
@@ -444,11 +455,26 @@ def propagate_through_operator(
         )
 
         kept_idx = _k_largest_products(
-            to_evolve.coeffs,
-            other.coeffs,
-            max_terms,
+            np.array(to_evolve.coeffs[::search_step]),
+            np.array(other.coeffs[::search_step]),
+            max(1, max_terms // (search_step**3)),
             assume_op1_hermitian=True,
         )
+        if search_step != 1:
+            off_diag = kept_idx[:, 0] != kept_idx[:, 2]
+            boundaries = np.array((len(other), len(to_evolve), len(other)))
+            coarse_grain_shape = (search_step, search_step, search_step)
+            kept_idx *= search_step
+            cube = np.indices(coarse_grain_shape).reshape(3, -1).T
+            # axes: [coarse_idx, fine_idx, operator]
+            off_diag_cubes = (kept_idx[off_diag, None, :] + cube[None, :, :]).reshape(-1, 3)
+            upper_wedge = cube[cube[:, 0] <= cube[:, 2]]
+            diagonal_wedges = (
+                kept_idx[np.logical_not(off_diag), None, :] + upper_wedge[None, :, :]
+            ).reshape(-1, 3)
+            kept_idx = np.concatenate((diagonal_wedges, off_diag_cubes), axis=0)
+            # Drop any outside of allowed range:
+            kept_idx = kept_idx[np.all(kept_idx < boundaries, axis=1)]
 
         off_diag = kept_idx[:, 0] != kept_idx[:, 2]
         # axes: [term, operator]
@@ -468,8 +494,6 @@ def propagate_through_operator(
             paulis_each_term, coeffs_each_term, ignore_pauli_phase=False, copy=False
         )
 
-        assert np.all(kept_idx[:, 0] <= kept_idx[:, 2])
-        assert np.all(product.paulis.phase == 0)
         off_diag = kept_idx[:, 0] != kept_idx[:, 2]
         product.coeffs[off_diag] = 2 * product.coeffs[off_diag].real
 
@@ -500,12 +524,14 @@ def propagate_through_operator(
         # Chop any numerical noise
         product.coeffs.imag = 0
 
+    product = product.simplify(atol=atol)
+
     if coerce_op1_traceless:
         non_id_mask = np.any(product.paulis.z | product.paulis.x, axis=1)
         if not np.all(non_id_mask):
             product = product[non_id_mask]
 
-    return product.simplify(atol=atol)
+    return product
 
 
 def _k_largest_products(
