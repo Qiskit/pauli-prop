@@ -26,6 +26,7 @@ dependencies = [
     "qiskit>=2.1.2, <3",
     "numpy>=1.26",
     "qiskit-ibm-runtime>=0.38",
+    "qiskit-aer>=0.17",
 ]
 
 [tool.maturin]
