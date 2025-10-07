@@ -179,6 +179,9 @@ class RotationGates(NamedTuple):
                 raise ValueError(f"Encountered unsupported gate: {inst.name}")
             gate = SparsePauliOp.from_operator(Operator(inst.operation))
             rotation_pauli = gate.paulis[np.any((gate.paulis.z | gate.paulis.x), axis=1)]
+            # Paulis w 0.0 rotation angles may not contain a Pauli term, so ignore them
+            if len(rotation_pauli) == 0:
+                return
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
@@ -417,7 +420,7 @@ def propagate_through_operator(
 
     Raises:
         ValueError: ``frame`` is neither ``s`` nor ``h``.
-        ValueError: ``max_terms`` is not positive.
+        ValueError: ``max_terms`` contains an invalid value.
     """
     if frame == "h":
         op2 = op2.adjoint()
@@ -428,6 +431,8 @@ def propagate_through_operator(
 
     num_leads = min(num_leading_terms, len(op1))
     if max_terms is not None:
+        if max_terms < 1:
+            raise ValueError("max_terms must be a positive integer or None")
         # sort terms of each operator (descending by magnitude):
         ordering = np.argsort(np.abs(op1.coeffs))[::-1]
         to_evolve = SparsePauliOp(
