@@ -41,14 +41,9 @@ All documentation is available `here <https://qiskit.github.io/pauli-prop/>`_.
 Installation
 ------------
 
-We encourage installing this package via ``pip``, when possible:
-
-.. code-block:: bash
-
-   pip install 'pauli-prop'
 This package is still in early development and has not yet had an initial release. Users who want to
 try this out early may install from source. Installing from source requires the user have the Rust
-toolchain installed. Visit the `Rust docs<https://rust-lang.org/tools/install/>`_ for more info.
+toolchain installed. Visit the `Rust docs <https://rust-lang.org/tools/install/>`_ for more info.
 
 .. code-block:: bash
 
@@ -110,7 +105,6 @@ References
   :hidden:
    
    Documentation Home <self>
-   Installation Instructions <install>
    Tutorials <tutorials/index>
    How-To Guides <how_tos/index>
    API Reference <apidocs/index>
