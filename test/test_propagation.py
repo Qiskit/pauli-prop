@@ -63,9 +63,7 @@ class TestPropagation(unittest.TestCase):
         expected_dict = _pauli_dict(expected)
         self.assertSetEqual(set(evolved_dict.keys()), set(expected_dict.keys()))
         evolved_coeffs = np.array([evolved_dict[key] for key in sorted(evolved_dict)])
-        expected_coeffs = np.array(
-            [expected_dict[key] for key in sorted(expected_dict)]
-        )
+        expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
         assert_allclose(evolved_coeffs, expected_coeffs)
 
     def test_propagate_through_rotation_gates_heisenberg(self):
@@ -89,9 +87,7 @@ class TestPropagation(unittest.TestCase):
         expected_dict = _pauli_dict(expected)
         self.assertSetEqual(set(evolved_dict.keys()), set(expected_dict.keys()))
         evolved_coeffs = np.array([evolved_dict[key] for key in sorted(evolved_dict)])
-        expected_coeffs = np.array(
-            [expected_dict[key] for key in sorted(expected_dict)]
-        )
+        expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
         assert_allclose(evolved_coeffs, expected_coeffs)
 
     def test_evolve_through_cliffords_decomposition(self):
@@ -105,9 +101,7 @@ class TestPropagation(unittest.TestCase):
 
         clifford, non_cliffords = evolve_through_cliffords(circuit)
 
-        reconstructed = (
-            Operator(non_cliffords).data @ Operator(clifford.to_circuit()).data
-        )
+        reconstructed = Operator(non_cliffords).data @ Operator(clifford.to_circuit()).data
         expected = Operator(circuit).data
 
         assert_allclose(reconstructed, expected)
@@ -120,16 +114,10 @@ class TestPropagation(unittest.TestCase):
     def test_propagate_through_operator_exact_and_traceless(self):
         """Exact propagation should agree with matrix conjugation and support traceless outputs."""
 
-        op1 = SparsePauliOp.from_list(
-            [(label, coeff) for label, coeff in [("I", 0.2), ("Z", 0.6)]]
-        )
-        op2 = SparsePauliOp.from_list(
-            [(label, coeff) for label, coeff in [("X", 0.5), ("Z", 1.0)]]
-        )
+        op1 = SparsePauliOp.from_list([(label, coeff) for label, coeff in [("I", 0.2), ("Z", 0.6)]])
+        op2 = SparsePauliOp.from_list([(label, coeff) for label, coeff in [("X", 0.5), ("Z", 1.0)]])
 
-        evolved = propagate_through_operator(
-            op1, op2, max_terms=None, coerce_op1_traceless=True
-        )
+        evolved = propagate_through_operator(op1, op2, max_terms=None, coerce_op1_traceless=True)
 
         matrix_evolved = op2.to_matrix() @ op1.to_matrix() @ op2.to_matrix().conj().T
         expected = SparsePauliOp.from_operator(matrix_evolved, atol=1e-12, rtol=0.0)
@@ -142,9 +130,7 @@ class TestPropagation(unittest.TestCase):
         expected_dict.pop("I", None)
         self.assertSetEqual(set(evolved_dict.keys()), set(expected_dict.keys()))
         evolved_coeffs = np.array([evolved_dict[key] for key in sorted(evolved_dict)])
-        expected_coeffs = np.array(
-            [expected_dict[key] for key in sorted(expected_dict)]
-        )
+        expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
         assert_allclose(evolved_coeffs, expected_coeffs)
 
     def test_propagate_through_operator_truncation(self):
