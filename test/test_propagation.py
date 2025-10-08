@@ -107,7 +107,7 @@ class TestPropagation(unittest.TestCase):
         assert_allclose(reconstructed, expected)
 
         # All instructions in the remainder should be Pauli rotations.
-        allowed_ops = {"rzx", "rzz", "pauli_evolution", "PauliEvolution"}
+        allowed_ops = {"PauliEvolution", "rzz"}
         for inst in non_cliffords:
             self.assertIn(inst.operation.name, allowed_ops)
 
