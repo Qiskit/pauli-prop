@@ -46,9 +46,15 @@ We encourage installing this package via ``pip``, when possible:
 .. code-block:: bash
 
    pip install 'pauli-prop'
+This package is still in early development and has not yet had an initial release. Users who want to
+try this out early may install from source. Installing from source requires the user have the Rust
+toolchain installed. Visit the `Rust docs<https://rust-lang.org/tools/install/>`_ for more info.
 
+.. code-block:: bash
 
-For more installation information refer to the `installation instructions <install.rst>`_ in the documentation.
+   cd path_to_repository/
+   pip install -e .
+
 
 Citing this project
 -------------------
