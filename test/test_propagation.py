@@ -37,7 +37,7 @@ def _pauli_dict(op: SparsePauliOp) -> dict[str, complex]:
     simplified = op.simplify(atol=1e-12)
     paulis = simplified.paulis.to_labels()
     coeffs = simplified.coeffs.astype(complex)
-    return {label: coeff for label, coeff in zip(paulis, coeffs)}
+    return {label: coeff for label, coeff in zip(paulis, coeffs, strict=True)}
 
 
 class TestPropagation(unittest.TestCase):
