@@ -1,5 +1,9 @@
 [build-system]
-requires = ["maturin>=1.0"]
+requires = [
+    "maturin>=1.0,<2.0",
+    "setuptools>=45",
+    "setuptools_scm[toml]>=6.2",
+]
 build-backend = "maturin"
 
 [project]
@@ -7,11 +11,11 @@ name = "pauli-prop"
 version = "0.0.0"
 readme = "README.md"
 description = "Library for performing Pauli propagation."
-license = {file = "LICENSE.txt"}
+license = "Apache-2.0"
+license-files = ["LICENSE.txt"]
 classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3.10",
