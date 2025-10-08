@@ -144,8 +144,43 @@ class TestPropagation(unittest.TestCase):
         )
 
         self.assertLessEqual(len(truncated), 2)
-        self.assertTrue(any(label != "I" for label in truncated.paulis.to_labels()))
 
+        ordering = np.argsort(np.abs(op1.coeffs))[::-1]
+        op1_sorted = SparsePauliOp(
+            op1.paulis[ordering], op1.coeffs[ordering], ignore_pauli_phase=True, copy=False
+        )
+        ordering = np.argsort(np.abs(op2.coeffs))[::-1]
+        op2_sorted = SparsePauliOp(
+            op2.paulis[ordering], op2.coeffs[ordering], ignore_pauli_phase=True, copy=False
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+        combos: list[tuple[int, int, int, complex]] = []
+        for a_idx in range(len(op2_sorted)):
+            for b_idx in range(len(op1_sorted)):
+                for c_idx in range(len(op2_sorted)):
+                    coeff = (
+                        op2_sorted.coeffs[a_idx]
+                        * op1_sorted.coeffs[b_idx]
+                        * op2_sorted.coeffs[c_idx].conjugate()
+                    )
+                    combos.append((a_idx, b_idx, c_idx, coeff))
+        combos.sort(key=lambda item: abs(item[3]), reverse=True)
+        combos = combos[:2]
+
+        paulis = []
+        coeffs = []
+        for a_idx, b_idx, c_idx, coeff in combos:
+            pauli = op2_sorted.paulis[a_idx] @ op1_sorted.paulis[b_idx] @ op2_sorted.paulis[c_idx]
+            if a_idx != c_idx:
+                coeff = 2 * coeff.real
+            coeff *= (-1j) ** pauli.phase
+            pauli.phase = 0
+            paulis.append(pauli)
+            coeffs.append(coeff)
+
+        expected = SparsePauliOp(PauliList(paulis), coeffs, ignore_pauli_phase=True)
+        expected = expected.simplify(atol=0.0)
+
+        truncated_dict = _pauli_dict(truncated)
+        expected_dict = _pauli_dict(expected)
+        self.assertEqual(truncated_dict, expected_dict)
