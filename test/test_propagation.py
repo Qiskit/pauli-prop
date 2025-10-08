@@ -123,10 +123,12 @@ class TestPropagation(unittest.TestCase):
         matrix_evolved = op2.to_matrix() @ op1.to_matrix() @ op2.to_matrix().conj().T
         expected = SparsePauliOp.from_operator(matrix_evolved, atol=1e-12, rtol=0.0)
         expected = expected.simplify(atol=1e-12)
-        expected = expected[1:]  # remove the identity term
 
         evolved_dict = _pauli_dict(evolved)
+        self.assertNotIn("I", evolved_dict)
+
         expected_dict = _pauli_dict(expected)
+        expected_dict.pop("I", None)
         self.assertSetEqual(set(evolved_dict.keys()), set(expected_dict.keys()))
         evolved_coeffs = np.array([evolved_dict[key] for key in sorted(evolved_dict)])
         expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
