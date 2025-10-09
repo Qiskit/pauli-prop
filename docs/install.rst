@@ -1,3 +1,0 @@
-Installation Instructions
-=========================
-WRITE ME
