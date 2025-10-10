@@ -87,7 +87,7 @@ manylinux-aarch64-image = "manylinux2014"
 skip = "cp38-* cp39-* *musllinux* *win32 *i686"
 test-skip = "*win32 *linux_i686"
 test-extras = "test"
-test-command = "pytest {project}/tests"
+test-command = "pytest {project}/test"
 environment = 'RUSTUP_TOOLCHAIN="stable"'
 
 [tool.cibuildwheel.macos]
