@@ -84,7 +84,7 @@ docs = [
 [tool.cibuildwheel]
 manylinux-x86_64-image = "manylinux2014"
 manylinux-aarch64-image = "manylinux2014"
-skip = "cp38-* cp39-* *musllinux* *win32 *i686"
+skip = "cp38-* cp39-* cp314-* *musllinux* *win32 *i686"
 test-skip = "*win32 *linux_i686"
 test-extras = "test"
 test-command = "pytest {project}/test"
