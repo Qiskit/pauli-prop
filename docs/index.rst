@@ -5,7 +5,7 @@ Pauli Prop
 About
 -----
 
-Pauli propagation, also known as sparse Pauli dynamics (SPD), is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels [1] - [4]. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis. The technique has been used to classically estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to be run on a quantum processor [5]. To learn how to use this package to simulate expectation values of quantum systems, check out the tutorial.
+Pauli propagation, also known as sparse Pauli dynamics (SPD), is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels [1] - [5]. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis. The technique has been used to classically estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to be run on a quantum processor [6]. To learn how to use this package to simulate expectation values of quantum systems, check out the tutorial.
 
 This package provides a Rust-accelerated Python interface for performing the most common Pauli propagation routines.
 
@@ -85,13 +85,15 @@ References
 
 [1] Tomislav Begušić, Johnnie Gray, Garnet Kin-Lic Chan, [Fast and converged classical simulations of evidence for the utility of quantum computing before fault tolerance](https://arxiv.org/abs/2308.05077), arXiv:2308.05077 [quant-ph].
 
-[2] Manuel S. Rudolph, et al., [Pauli Propagation: A Computational Framework for Simulating Quantum Systems](https://arxiv.org/abs/2505.21606), arXiv:2505.21606 [quant-ph].
+[2] Nicolas Loizeau, et al., [Quantum many-body simulations with PauliStrings.jl](https://arxiv.org/abs/2410.09654), arXiv:2410.09654 [quant-ph].
 
-[3] Hrant Gharibyan, et al., [A Practical Guide to using Pauli Path Simulators for Utility-Scale Quantum Experiments](https://arxiv.org/abs/2507.10771), arXiv:2507.10771 [quant-ph].
+[3] Manuel S. Rudolph, et al., [Pauli Propagation: A Computational Framework for Simulating Quantum Systems](https://arxiv.org/abs/2505.21606), arXiv:2505.21606 [quant-ph].
 
-[4] Lukas Broers, et al., [Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra](https://arxiv.org/abs/2506.13241), arXiv:2506.13241 [quant-ph].
+[4] Hrant Gharibyan, et al., [A Practical Guide to using Pauli Path Simulators for Utility-Scale Quantum Experiments](https://arxiv.org/abs/2507.10771), arXiv:2507.10771 [quant-ph].
 
-[5] Bryce Fuller, et al., [Improved Quantum Computation using Operator Backpropagation](https://arxiv.org/abs/2502.01897), arXiv:2502.01897 [quant-ph].
+[5] Lukas Broers, et al., [Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra](https://arxiv.org/abs/2506.13241), arXiv:2506.13241 [quant-ph].
+
+[6] Bryce Fuller, et al., [Improved Quantum Computation using Operator Backpropagation](https://arxiv.org/abs/2502.01897), arXiv:2502.01897 [quant-ph].
 
 .. toctree::
   :hidden:
