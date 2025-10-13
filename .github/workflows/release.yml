@@ -59,7 +59,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Publish release
-        uses: ghalactic/github-release-from-tag@v5
+        uses: ghalactic/github-release-from-tag@v6
         with:
           prerelease: false
           generateReleaseNotes: "true"
