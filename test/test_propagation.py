@@ -20,6 +20,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_allclose
 from pauli_prop import (
+    RotationGates,
     circuit_to_rotation_gates,
     evolve_through_cliffords,
     propagate_through_circuit,
@@ -28,7 +29,7 @@ from pauli_prop import (
 )
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import RZZGate
-from qiskit.quantum_info import Operator, PauliList, SparsePauliOp
+from qiskit.quantum_info import Clifford, Operator, PauliList, SparsePauliOp
 
 
 def _pauli_dict(op: SparsePauliOp) -> dict[str, complex]:
@@ -79,6 +80,44 @@ class TestPropagation(unittest.TestCase):
         )
 
         unitary = Operator(circuit).data
+        expected_matrix = unitary.conj().T @ operator.to_matrix() @ unitary
+        expected = SparsePauliOp.from_operator(expected_matrix, atol=1e-12, rtol=0.0)
+
+        self.assertEqual(trunc_norm, 0.0)
+        evolved_dict = _pauli_dict(evolved)
+        expected_dict = _pauli_dict(expected)
+        self.assertSetEqual(set(evolved_dict.keys()), set(expected_dict.keys()))
+        evolved_coeffs = np.array([evolved_dict[key] for key in sorted(evolved_dict)])
+        expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
+        assert_allclose(evolved_coeffs, expected_coeffs)
+
+    def test_rotation_gates_with_clifford(self):
+        """Test the RotationGates handling with an extracted Clifford component.
+
+        This is a regression test against https://github.com/Qiskit/pauli-prop/issues/25.
+        """
+        cnot = QuantumCircuit(2)
+        cnot.cx(0, 1)
+        clifford = Clifford.from_circuit(cnot)
+
+        num_qubits = 2
+        circuit = QuantumCircuit(num_qubits)
+        circuit.rx(math.pi / 7, 0)
+
+        rot_gates = RotationGates([], [], [])
+        for inst in circuit.data:
+            rot_gates.append_circuit_instruction(
+                inst, [qb._index for qb in inst.qubits], num_qubits, clifford=clifford
+            )
+
+        operator = SparsePauliOp.from_list([("IX", 0.75), ("ZI", -0.25)])
+
+        evolved, trunc_norm = propagate_through_rotation_gates(
+            operator, rot_gates, max_terms=8, atol=1e-12, frame="h"
+        )
+
+        cliff_op = Operator(clifford).data
+        unitary = cliff_op.conj().T @ Operator(circuit).data @ cliff_op
         expected_matrix = unitary.conj().T @ operator.to_matrix() @ unitary
         expected = SparsePauliOp.from_operator(expected_matrix, atol=1e-12, rtol=0.0)
 
