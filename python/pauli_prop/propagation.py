@@ -200,6 +200,7 @@ class RotationGates(NamedTuple):
 
         assert rotation_pauli.phase == 0
 
+        qargs = np.where(rotation_pauli.z | rotation_pauli.x)[0].tolist()
         gate_arr = np.concatenate((rotation_pauli.x, rotation_pauli.z))
 
         self.gates.append(gate_arr)
