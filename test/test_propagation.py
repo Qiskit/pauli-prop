@@ -130,6 +130,7 @@ class TestPropagation(unittest.TestCase):
 
         self.assertEqual(trunc_clamped, trunc_full)
         self.assertEqual(_pauli_dict(evolved_clamped), _pauli_dict(evolved_full))
+
     def test_rotation_gates_with_clifford(self):
         """Test the RotationGates handling with an extracted Clifford component.
 
