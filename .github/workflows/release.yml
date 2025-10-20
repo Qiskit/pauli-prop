@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Build wheel
-        uses: pypa/cibuildwheel@v3.2.0
+        uses: pypa/cibuildwheel@v3.2.1
       - name: Store the wheel
         uses: actions/upload-artifact@v4
         with:
