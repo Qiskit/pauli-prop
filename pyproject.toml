@@ -67,7 +67,8 @@ notebook-dependencies = [
     "pauli-prop",
     "matplotlib",
     "qiskit-ibm-runtime",
-    "rustworkx[graphviz]>=0.15",
+    "graphviz",
+    "rustworkx>=0.15",
     "ipywidgets",
     "pylatexenc",
 ]
