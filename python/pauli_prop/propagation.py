@@ -234,7 +234,7 @@ def circuit_to_rotation_gates(
 def propagate_through_rotation_gates(
     operator: SparsePauliOp,
     rot_gates: RotationGates,
-    max_terms: int,
+    max_terms: int | None,
     atol: float,
     frame: str,
 ) -> tuple[SparsePauliOp, float]:
@@ -261,7 +261,9 @@ def propagate_through_rotation_gates(
     Args:
         operator: The operator to propagate
         rot_gates: The circuit represented in the form of :class:`.RotationGates` (see also :func:`.circuit_to_rotation_gates`).
-        max_terms: The maximum number of terms the operator may contain as it is propagated
+        max_terms: The maximum number of terms the operator may contain as it is propagated.
+            When ``None``, space for the full Pauli basis will be allocated. Values exceeding the
+            Pauli basis size are clamped to the full basis size.
         atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated. This parameter is not a
             guarantee on the accuracy of the returned operator.
         frame:
@@ -274,10 +276,15 @@ def propagate_through_rotation_gates(
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
-        ValueError: ``max_terms`` is not positive.
+        ValueError: ``max_terms`` is not positive when provided.
     """
-    if max_terms < 1:
-        raise ValueError("max_terms must be a positive integer.")
+    full_basis_terms = 1 << (2 * operator.num_qubits)
+    if max_terms is None:
+        max_terms = full_basis_terms
+    elif max_terms < 1:
+        raise ValueError("max_terms must be a positive integer or None.")
+    elif max_terms > full_basis_terms:
+        max_terms = full_basis_terms
     if atol < 0.0:
         raise ValueError("atol must be non-negative.")
     if len(rot_gates.gates) == 0:
@@ -321,7 +328,7 @@ def propagate_through_rotation_gates(
 def propagate_through_circuit(
     operator: SparsePauliOp,
     circuit: QuantumCircuit,
-    max_terms: int,
+    max_terms: int | None,
     atol: float,
     frame: str,
 ) -> tuple[SparsePauliOp, float]:
@@ -348,7 +355,9 @@ def propagate_through_circuit(
     Args:
         operator: The operator to propagate
         circuit: The circuit through which the operator will be propagated
-        max_terms: The maximum number of terms the operator may contain as it is propagated
+        max_terms: The maximum number of terms the operator may contain as it is propagated.
+            When ``None``, space for the full Pauli basis will be allocated. Values exceeding the
+            Pauli basis size are clamped to the full basis size.
         atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated. This parameter is not a
             guarantee on the accuracy of the returned operator.
         frame:
@@ -361,7 +370,7 @@ def propagate_through_circuit(
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
-        ValueError: ``max_terms`` is not positive.
+        ValueError: ``max_terms`` is not positive when provided.
     """
     rot_gates = circuit_to_rotation_gates(circuit)
     return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
