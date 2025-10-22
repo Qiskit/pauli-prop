@@ -2,17 +2,19 @@
 
 ### About
 
-Pauli propagation, also known as sparse Pauli dynamics (SPD), is a framework for approximating the
-evolution of operators in the Pauli basis under the action of other operators, such as quantum
-circuit gates and noise channels [1] - [5]. This approach can be effective when the operators
-involved are expected to remain sparse in the Pauli basis. The technique has been used to classically
-estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to
-be run on a quantum processor [6]. To learn how to use this package to simulate expectation values of
-quantum systems, check out the [tutorial](https://github.com/Qiskit/pauli-prop/tree/main/docs/tutorials/simulate_kicked_ising.ipynb).
+Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis
+under the action of other operators, such as quantum circuit gates and noise channels [1] - [5].
+This approach can be effective when the operators involved are expected to remain sparse in the
+Pauli basis. The technique has been used to classically estimate expectation values of quantum
+systems and also to reduce the depths of quantum circuits to be run on a quantum processor [6].
 
-This package provides a Rust-accelerated Python interface for performing the most common Pauli
-propagation routines.
+This package provides a Rust-accelerated Python interface for performing Pauli propagation. The
+subroutines in this package may be used to implement:
 
+- Classical simulation of expectation values
+- Operator backpropagation (OBP) [6]
+- Lightcone shading [7] and other novel error mitigation techniques
+  
 ##### Technical details
 
 - Rust-accelerated Python interface
