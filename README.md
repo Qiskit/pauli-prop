@@ -11,9 +11,9 @@ systems and also to reduce the depths of quantum circuits to be run on a quantum
 This package provides a Rust-accelerated Python interface for performing Pauli propagation. The
 subroutines in this package may be used to implement:
 
-- Classical simulation of expectation values
-- Operator backpropagation (OBP) [6]
 - Lightcone shading [7] and other novel error mitigation techniques
+- Operator backpropagation (OBP) [6]
+- Classical simulation of expectation values
   
 ##### Technical details
 
@@ -107,3 +107,5 @@ By participating, you are expected to uphold Qiskit's [code of conduct](https://
 [5] Lukas Broers, et al., [Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra](https://arxiv.org/abs/2506.13241), arXiv:2506.13241 [quant-ph].
 
 [6] Bryce Fuller, et al., [Improved Quantum Computation using Operator Backpropagation](https://arxiv.org/abs/2502.01897), arXiv:2502.01897 [quant-ph].
+
+[7] Andrew Eddins, Minh C. Tran, Patrick Rall, [Lightcone shading for classically accelerated quantum error mitigation](https://arxiv.org/abs/2409.04401), arXiv:2409.04401 [quant-ph].
