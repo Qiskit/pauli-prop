@@ -59,82 +59,6 @@ KNOWN_CLIFFS = {
 }
 
 
-def _commutation_matrix(pl1: PauliList, pl2: PauliList, negate=False):
-    a_dot_b = (np.asarray(pl1._x, dtype=np.uint8) @ np.asarray(pl2._z.T, dtype=np.uint8)) & 1
-    b_dot_a = (np.asarray(pl1._z, dtype=np.uint8) @ np.asarray(pl2._x.T, dtype=np.uint8)) & 1
-    if negate:
-        return a_dot_b != b_dot_a
-    return a_dot_b == b_dot_a
-
-
-def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, QuantumCircuit]:
-    r"""Evolve (Schrödinger frame) all non-Clifford instructions through all Clifford gates in the circuit.
-
-    This shifts all recognized Clifford gates to the beginning of the circuit and updates the bases of
-    Pauli-rotation gates (e.g. ``RxGate``, ``RzzGate``, ``PauliEvolutionGate``) and `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_
-    channels. Other operations are not supported. See `Pauli.evolve docs <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.quantum_info.Pauli#evolve>`_ for more info about evolution
-    of Paulis by Cliffords.
-
-    The effect is similar to going to the Clifford interaction picture in `arXiv:2306.04797 <https://arxiv.org/abs/2306.04797>`_ but
-    without mapping all rotation angle magnitudes to be :math:`\leq \pi/4`.
-
-    The function returns two objects representing the Clifford and non-Clifford parts of the circuit.
-
-    Args:
-        circuit: The ``QuantumCircuit`` to transform. Can contain only Pauli-rotation gates, ``PauliLindbladError`` (appended to the
-            circuit as quantum channels), and recognized Clifford gates.
-
-    Returns:
-            * **Clifford** - A single all-qubit `Clifford <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.quantum_info.Clifford>`_ representing the first part of the circuit
-            * **QuantumCircuit** - A circuit containing the remaining, transformed part of the circuit
-
-    Raises:
-        ValueError: Input circuit contains unsupported gate
-    """
-    id_pauli = Pauli("I" * circuit.num_qubits)
-    net_clifford = Clifford.from_label("I" * circuit.num_qubits)
-    non_cliffords = QuantumCircuit.copy_empty_like(circuit)
-    for i, circ_inst in enumerate(reversed(circuit)):
-        if circ_inst.name == "barrier":
-            continue
-        qargs = [circuit.find_bit(qubit).index for qubit in circ_inst.qubits]
-        if circ_inst.name in KNOWN_CLIFFS:
-            net_clifford = net_clifford.dot(circ_inst.operation, qargs)
-        elif circ_inst.name in _ROTATION_TO_GENERATOR:
-            # Pauli rotation gate:
-            pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
-            # Expand to full width of the circuit:
-            pauli = id_pauli.dot(pauli, qargs=qargs)
-            # Evolve by all subsequent Cliffords:
-            # For large circuits, faster to evolve by net_clifford than by individual gates
-            pauli = pauli.evolve(net_clifford, frame="s")
-            pauli_evo_angle = circ_inst.params[0] / 2
-            if pauli.phase == 2:
-                pauli_evo_angle *= -1
-                pauli.phase = 0
-            assert pauli.phase == 0  # Paulis should always have real coeffs
-            # Reduce to supported qubits only:
-            support = np.where(pauli.z | pauli.x)[0].tolist()
-            pauli = pauli[support]
-            # Collect in non_cliffords circuit as Pauli rotation
-            peg = PauliEvolutionGate(pauli, pauli_evo_angle)
-            non_cliffords.append(peg, qargs=support, copy=False)
-        elif circ_inst.name == "quantum_channel" and hasattr(circ_inst.operation, "_quantum_error"):
-            # Pauli-Lindblad channel:
-            error = circ_inst.operation._quantum_error
-            # Expand to full width of the circuit:
-            generators = PauliList([id_pauli] * len(error.generators))
-            generators.dot(error.generators, qargs=qargs, inplace=True)
-            # Evolve by all subsequent Cliffords:
-            ple = PauliLindbladError(generators.evolve(net_clifford, frame="s"), error.rates)
-            non_cliffords.append(ple, qargs=range(circuit.num_qubits), copy=False)
-        else:
-            raise ValueError(
-                f"Unsupported gate encountered in circuit data idx {len(circuit) - (i + 1)}: {circ_inst.name}"
-            )
-    return net_clifford, non_cliffords.reverse_ops()
-
-
 class RotationGates(NamedTuple):
     """An intermediate minimal representation of a :class:`.QuantumCircuit`.
 
@@ -206,6 +130,74 @@ class RotationGates(NamedTuple):
         self.gates.append(gate_arr)
         self.qargs.append(qargs)
         self.thetas.append(theta)
+
+
+def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, QuantumCircuit]:
+    r"""Evolve (Schrödinger frame) all non-Clifford instructions through all Clifford gates in the circuit.
+
+    This shifts all recognized Clifford gates to the beginning of the circuit and updates the bases of
+    Pauli-rotation gates (e.g. ``RxGate``, ``RzzGate``, ``PauliEvolutionGate``) and `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_
+    channels. Other operations are not supported. See `Pauli.evolve docs <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.quantum_info.Pauli#evolve>`_ for more info about evolution
+    of Paulis by Cliffords.
+
+    The effect is similar to going to the Clifford interaction picture in `arXiv:2306.04797 <https://arxiv.org/abs/2306.04797>`_ but
+    without mapping all rotation angle magnitudes to be :math:`\leq \pi/4`.
+
+    The function returns two objects representing the Clifford and non-Clifford parts of the circuit.
+
+    Args:
+        circuit: The ``QuantumCircuit`` to transform. Can contain only Pauli-rotation gates, ``PauliLindbladError`` (appended to the
+            circuit as quantum channels), and recognized Clifford gates.
+
+    Returns:
+            * **Clifford** - A single all-qubit `Clifford <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.quantum_info.Clifford>`_ representing the first part of the circuit
+            * **QuantumCircuit** - A circuit containing the remaining, transformed part of the circuit
+
+    Raises:
+        ValueError: Input circuit contains unsupported gate
+    """
+    id_pauli = Pauli("I" * circuit.num_qubits)
+    net_clifford = Clifford.from_label("I" * circuit.num_qubits)
+    non_cliffords = QuantumCircuit.copy_empty_like(circuit)
+    for i, circ_inst in enumerate(reversed(circuit)):
+        if circ_inst.name == "barrier":
+            continue
+        qargs = [circuit.find_bit(qubit).index for qubit in circ_inst.qubits]
+        if circ_inst.name in KNOWN_CLIFFS:
+            net_clifford = net_clifford.dot(circ_inst.operation, qargs)
+        elif circ_inst.name in _ROTATION_TO_GENERATOR:
+            # Pauli rotation gate:
+            pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+            # Expand to full width of the circuit:
+            pauli = id_pauli.dot(pauli, qargs=qargs)
+            # Evolve by all subsequent Cliffords:
+            # For large circuits, faster to evolve by net_clifford than by individual gates
+            pauli = pauli.evolve(net_clifford, frame="s")
+            pauli_evo_angle = circ_inst.params[0] / 2
+            if pauli.phase == 2:
+                pauli_evo_angle *= -1
+                pauli.phase = 0
+            assert pauli.phase == 0  # Paulis should always have real coeffs
+            # Reduce to supported qubits only:
+            support = np.where(pauli.z | pauli.x)[0].tolist()
+            pauli = pauli[support]
+            # Collect in non_cliffords circuit as Pauli rotation
+            peg = PauliEvolutionGate(pauli, pauli_evo_angle)
+            non_cliffords.append(peg, qargs=support, copy=False)
+        elif circ_inst.name == "quantum_channel" and hasattr(circ_inst.operation, "_quantum_error"):
+            # Pauli-Lindblad channel:
+            error = circ_inst.operation._quantum_error
+            # Expand to full width of the circuit:
+            generators = PauliList([id_pauli] * len(error.generators))
+            generators.dot(error.generators, qargs=qargs, inplace=True)
+            # Evolve by all subsequent Cliffords:
+            ple = PauliLindbladError(generators.evolve(net_clifford, frame="s"), error.rates)
+            non_cliffords.append(ple, qargs=range(circuit.num_qubits), copy=False)
+        else:
+            raise ValueError(
+                f"Unsupported gate encountered in circuit data idx {len(circuit) - (i + 1)}: {circ_inst.name}"
+            )
+    return net_clifford, non_cliffords.reverse_ops()
 
 
 def circuit_to_rotation_gates(
@@ -562,3 +554,11 @@ def _k_largest_products(
 
     ind_out: np.ndarray = np.array(k_largest_products_r(arr1, arr2, k, assume_op1_hermitian))
     return ind_out
+
+
+def _commutation_matrix(pl1: PauliList, pl2: PauliList, negate=False):
+    a_dot_b = (np.asarray(pl1.x, dtype=np.uint8) @ np.asarray(pl2.z.T, dtype=np.uint8)) & 1
+    b_dot_a = (np.asarray(pl1.z, dtype=np.uint8) @ np.asarray(pl2.x.T, dtype=np.uint8)) & 1
+    if negate:
+        return a_dot_b != b_dot_a
+    return a_dot_b == b_dot_a
