@@ -53,7 +53,7 @@ jobs:
       - name: Checkout tag
         uses: actions/checkout@v5
       - name: Download artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: pkg-*
           path: dist
@@ -83,7 +83,7 @@ jobs:
       - name: Checkout tag
         uses: actions/checkout@v5
       - name: Download artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: pkg-*
           path: dist
