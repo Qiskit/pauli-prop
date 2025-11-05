@@ -30,10 +30,6 @@ Both the memory and time cost for Pauli propagation routines generally scale wit
 
 ``propagate_through_operator``: Conjugates one operator in the Pauli basis by another by greedily accumulating terms in the sum, :math:`\sum_{i,j,k}G^{\dagger}_iO_jG_k`, where :math:`i,j,k` are sparse indices over the Pauli basis. This implementation sorts the coefficients in each operator by descending magnitude then searches the 3D index space for the terms with the largest coefficients, starting with the origin :math:`(0,0,0)`, and accumulating :math:`(i,j,k)` triplets up to a specified cutoff. The time spent searching can often be made negligible by increasing the search step size in :math:`(i,j,k)` space, which provides a cubic speedup for this subroutine. In our profiling, significant time can be spent sorting the operators and performing Pauli multiplication to generate the terms in the new operator.
 
-Documentation
--------------
-
-All documentation is available `here <https://qiskit.github.io/pauli-prop/>`_.
 
 Installation
 ------------
