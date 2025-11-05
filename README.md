@@ -13,7 +13,7 @@ subroutines in this package may be used to implement:
 
 - Lightcone shading [7] and other novel error mitigation techniques
 - Operator backpropagation (OBP) [6]
-- Classical simulation of expectation values
+- Classical simulation of expectation values [[tutorials](https://qiskit.github.io/pauli-prop/tutorials/index.html)]
   
 ##### Technical details
 
