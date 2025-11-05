@@ -11,7 +11,7 @@ This package provides a Rust-accelerated Python interface for performing Pauli p
 
 - Lightcone shading [7] and other novel error mitigation techniques
 - Operator backpropagation (OBP) [6] 
-- Classical simulation of expectation values
+- Classical simulation of expectation values [`tutorials <https://qiskit.github.io/pauli-prop/tutorials/index.html>`_]
 
 Technical details
 ^^^^^^^^^^^^^^^^^
@@ -30,10 +30,6 @@ Both the memory and time cost for Pauli propagation routines generally scale wit
 
 ``propagate_through_operator``: Conjugates one operator in the Pauli basis by another by greedily accumulating terms in the sum, :math:`\sum_{i,j,k}G^{\dagger}_iO_jG_k`, where :math:`i,j,k` are sparse indices over the Pauli basis. This implementation sorts the coefficients in each operator by descending magnitude then searches the 3D index space for the terms with the largest coefficients, starting with the origin :math:`(0,0,0)`, and accumulating :math:`(i,j,k)` triplets up to a specified cutoff. The time spent searching can often be made negligible by increasing the search step size in :math:`(i,j,k)` space, which provides a cubic speedup for this subroutine. In our profiling, significant time can be spent sorting the operators and performing Pauli multiplication to generate the terms in the new operator.
 
-Documentation
--------------
-
-All documentation is available `here <https://qiskit.github.io/pauli-prop/>`_.
 
 Installation
 ------------
@@ -87,19 +83,19 @@ License
 References
 ----------
 
-[1] Tomislav Begušić, Johnnie Gray, Garnet Kin-Lic Chan, [Fast and converged classical simulations of evidence for the utility of quantum computing before fault tolerance](https://arxiv.org/abs/2308.05077), arXiv:2308.05077 [quant-ph].
+[1] Tomislav Begušić, Johnnie Gray, Garnet Kin-Lic Chan, `Fast and converged classical simulations of evidence for the utility of quantum computing before fault tolerance <https://arxiv.org/abs/2308.05077>`_, arXiv:2308.05077 [quant-ph].
 
-[2] Nicolas Loizeau, et al., [Quantum many-body simulations with PauliStrings.jl](https://arxiv.org/abs/2410.09654), arXiv:2410.09654 [quant-ph].
+[2] Nicolas Loizeau, et al., `Quantum many-body simulations with PauliStrings.jl <https://arxiv.org/abs/2410.09654>`_, arXiv:2410.09654 [quant-ph].
 
-[3] Manuel S. Rudolph, et al., [Pauli Propagation: A Computational Framework for Simulating Quantum Systems](https://arxiv.org/abs/2505.21606), arXiv:2505.21606 [quant-ph].
+[3] Manuel S. Rudolph, et al., `Pauli Propagation: A Computational Framework for Simulating Quantum Systems <https://arxiv.org/abs/2505.21606>`_, arXiv:2505.21606 [quant-ph].
 
-[4] Hrant Gharibyan, et al., [A Practical Guide to using Pauli Path Simulators for Utility-Scale Quantum Experiments](https://arxiv.org/abs/2507.10771), arXiv:2507.10771 [quant-ph].
+[4] Hrant Gharibyan, et al., `A Practical Guide to using Pauli Path Simulators for Utility-Scale Quantum Experiments <https://arxiv.org/abs/2507.10771>`_, arXiv:2507.10771 [quant-ph].
 
-[5] Lukas Broers, et al., [Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra](https://arxiv.org/abs/2506.13241), arXiv:2506.13241 [quant-ph].
+[5] Lukas Broers, et al., `Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra <https://arxiv.org/abs/2506.13241>`_, arXiv:2506.13241 [quant-ph].
 
-[6] Bryce Fuller, et al., [Improved Quantum Computation using Operator Backpropagation](https://arxiv.org/abs/2502.01897), arXiv:2502.01897 [quant-ph].
+[6] Bryce Fuller, et al., `Improved Quantum Computation using Operator Backpropagation <https://arxiv.org/abs/2502.01897>`_, arXiv:2502.01897 [quant-ph].
 
-[7] Andrew Eddins, Minh C. Tran, Patrick Rall, [Lightcone shading for classically accelerated quantum error mitigation](https://arxiv.org/abs/2409.04401), arXiv:2409.04401 [quant-ph].
+[7] Andrew Eddins, Minh C. Tran, Patrick Rall, `Lightcone shading for classically accelerated quantum error mitigation <https://arxiv.org/abs/2409.04401>`_, arXiv:2409.04401 [quant-ph].
 
 .. toctree::
   :hidden:
