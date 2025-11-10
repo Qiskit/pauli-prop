@@ -26,7 +26,7 @@ Install from PyPI
 
 .. code:: sh
 
-    pip install 'pauli-prop`
+    pip install pauli-prop
 
 
 Install from Source
