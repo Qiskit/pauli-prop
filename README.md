@@ -56,10 +56,10 @@ All documentation is available at https://qiskit.github.io/pauli-prop/.
 
 ### Installation
 
-We encourage installing this package via `pip`, when possible:
+We encourage installing the package via `pip`, when possible:
 
 ```bash
-pip install 'pauli-prop'
+pip install pauli-prop
 ```
 
 For more installation information refer to these [installation instructions](docs/install.rst).
