@@ -45,7 +45,7 @@ We encourage installing this package via ``pip``, when possible:
 
 .. code-block:: bash
 
-   pip install 'pauli-prop'
+   pip install pauli-prop
 
 
 For more installation information refer to the `installation instructions <install.rst>`_ in the documentation.
