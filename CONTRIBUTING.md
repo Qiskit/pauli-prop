@@ -1,6 +1,6 @@
 # Developer guide
 
-Development of the `qiskit-addon-sqd` package takes place [on GitHub](https://github.com/Qiskit/qiskit-addon-sqd).
+Development of the `qiskit-addon-sqd` package takes place [on GitHub](https://github.com/Qiskit/pauli-prop).
 The [Contributing to Qiskit](https://github.com/Qiskit/qiskit/blob/main/CONTRIBUTING.md) guide may serve as a
 useful starting point, as this package builds on [Qiskit].
 
