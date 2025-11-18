@@ -91,6 +91,46 @@ class TestPropagation(unittest.TestCase):
         expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
         assert_allclose(evolved_coeffs, expected_coeffs)
 
+    def test_propagate_through_rotation_gates_none_max_terms(self):
+        """Allocating the full basis implicitly should match explicit sizing."""
+
+        circuit = QuantumCircuit(1)
+        circuit.rz(math.pi / 5, 0)
+        rot_gates = circuit_to_rotation_gates(circuit)
+        operator = SparsePauliOp.from_list([("X", 0.3), ("Y", -0.7)])
+
+        evolved_none, trunc_norm_none = propagate_through_rotation_gates(
+            operator, rot_gates, max_terms=None, atol=1e-12, frame="s"
+        )
+        evolved_explicit, trunc_norm_explicit = propagate_through_rotation_gates(
+            operator,
+            rot_gates,
+            max_terms=4**operator.num_qubits,
+            atol=1e-12,
+            frame="s",
+        )
+
+        self.assertEqual(trunc_norm_none, trunc_norm_explicit)
+        self.assertEqual(_pauli_dict(evolved_none), _pauli_dict(evolved_explicit))
+
+    def test_propagate_through_rotation_gates_clamps_oversized_max_terms(self):
+        """Requests larger than the Pauli basis should be clamped."""
+
+        circuit = QuantumCircuit(1)
+        circuit.rx(math.pi / 7, 0)
+        rot_gates = circuit_to_rotation_gates(circuit)
+        operator = SparsePauliOp.from_list([("X", 0.5)])
+
+        evolved_clamped, trunc_clamped = propagate_through_rotation_gates(
+            operator, rot_gates, max_terms=32, atol=0.0, frame="s"
+        )
+        evolved_full, trunc_full = propagate_through_rotation_gates(
+            operator, rot_gates, max_terms=4**operator.num_qubits, atol=0.0, frame="s"
+        )
+
+        self.assertEqual(trunc_clamped, trunc_full)
+        self.assertEqual(_pauli_dict(evolved_clamped), _pauli_dict(evolved_full))
+
     def test_rotation_gates_with_clifford(self):
         """Test the RotationGates handling with an extracted Clifford component.
 
@@ -149,6 +189,46 @@ class TestPropagation(unittest.TestCase):
         allowed_ops = {"PauliEvolution", "rzz"}
         for inst in non_cliffords:
             self.assertIn(inst.operation.name, allowed_ops)
+
+    def test_propagate_through_circuit_none_max_terms(self):
+        """Propagating through circuits should mirror explicit allocation."""
+
+        circuit = QuantumCircuit(2)
+        circuit.rx(math.pi / 6, 0)
+        circuit.ry(math.pi / 8, 1)
+        circuit.rxx(math.pi / 11, 0, 1)
+        operator = SparsePauliOp.from_list([("XI", 0.2), ("IZ", -0.4), ("YY", 0.3)])
+
+        evolved_none, trunc_norm_none = propagate_through_circuit(
+            operator, circuit, max_terms=None, atol=1e-12, frame="h"
+        )
+        evolved_explicit, trunc_norm_explicit = propagate_through_circuit(
+            operator,
+            circuit,
+            max_terms=4**operator.num_qubits,
+            atol=1e-12,
+            frame="h",
+        )
+
+        self.assertEqual(trunc_norm_none, trunc_norm_explicit)
+        self.assertEqual(_pauli_dict(evolved_none), _pauli_dict(evolved_explicit))
+
+    def test_propagate_through_circuit_clamps_oversized_max_terms(self):
+        """Requests larger than the Pauli basis should be clamped."""
+
+        circuit = QuantumCircuit(1)
+        circuit.ry(math.pi / 3, 0)
+        operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+        evolved_clamped, trunc_clamped = propagate_through_circuit(
+            operator, circuit, max_terms=64, atol=0.0, frame="h"
+        )
+        evolved_full, trunc_full = propagate_through_circuit(
+            operator, circuit, max_terms=4**operator.num_qubits, atol=0.0, frame="h"
+        )
+
+        self.assertEqual(trunc_clamped, trunc_full)
+        self.assertEqual(_pauli_dict(evolved_clamped), _pauli_dict(evolved_full))
 
     def test_propagate_through_operator_exact_and_traceless(self):
         """Exact propagation should agree with matrix conjugation and support traceless outputs."""
