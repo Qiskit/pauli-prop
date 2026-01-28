@@ -238,11 +238,11 @@ def propagate_through_rotation_gates(
     atol: float,
     frame: str,
 ) -> tuple[SparsePauliOp, float]:
-    """Propagate a sparse Pauli operator, :math:`O`, through a circuit (represented in ``rot_gates``), :math:`U`.
+    r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit (represented in ``rot_gates``), :math:`U`.
 
-    For Schrödinger propagation: :math:`U O U†`.
+    For Schrödinger propagation: :math:`U O U^{\dagger}`.
 
-    For Heisenberg propagation: :math:`U† O U`.
+    For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
@@ -325,11 +325,11 @@ def propagate_through_circuit(
     atol: float,
     frame: str,
 ) -> tuple[SparsePauliOp, float]:
-    """Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
+    r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
-    For Schrödinger propagation: :math:`U O U†`.
+    For Schrödinger propagation: :math:`U O U^{\dagger}`.
 
-    For Heisenberg propagation: :math:`U† O U`.
+    For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
@@ -377,11 +377,11 @@ def propagate_through_operator(
     atol: float = 0.0,
     search_step: int = 4,
 ) -> SparsePauliOp:
-    """Propagate an operator, `op1` or :math:`O`, through another operator, `op2` or :math:`U`.
+    r"""Propagate an operator, `op1` or :math:`O`, through another operator, `op2` or :math:`U`.
 
-    For Schrödinger evolution: :math:`U O U†`.
+    For Schrödinger evolution: :math:`U O U^{\dagger}`.
 
-    For Heisenberg evolution: :math:`U† O U`.
+    For Heisenberg evolution: :math:`U^{\dagger} O U`.
 
     Evolution is performed in the Pauli basis by summing terms of the form :math:`U_i O_j U_k`
     (neglecting the dagger, see note below). The number of such terms is cubic in operator size (`len(op1) * len(op2)**2`)
@@ -400,7 +400,7 @@ def propagate_through_operator(
 
     .. note::
 
-        :math:`O` is assumed to be Hermitian (:math:`O_j' = :math:`O_j†`)
+        :math:`O` is assumed to be Hermitian (:math:`O_j` = :math:`O_j^{\dagger}`)
 
     Args:
         op1: The operator to propagate
@@ -414,7 +414,7 @@ def propagate_through_operator(
 
         coerce_op1_traceless: A flag denoting whether to remove identity terms from the output operator.
         num_leading_terms: The number of terms in ``op1`` to conjugate by every term in ``op2``. The set of included terms
-            is expanded to include its union with the set of terms :math:`U_i O_j U_i†`, for :math:`j < num_leading_terms`.
+            is expanded to include its union with the set of terms :math:`U_i O_j U_i^{\dagger}`, for :math:`j < num_leading_terms`.
             This can improve accuracy for the leading components of `O` in the output, at some computational runtime cost.
         frame:
             `s` for Schrödinger evolution
