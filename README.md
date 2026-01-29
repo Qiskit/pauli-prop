@@ -18,6 +18,7 @@ subroutines in this package may be used to implement:
 ##### Technical details
 
 - Rust-accelerated Python interface
+- Current implementation is single-threaded
 - Ability to truncate operator terms during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
