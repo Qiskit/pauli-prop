@@ -7,10 +7,10 @@ use num_complex::{Complex, ComplexFloat};
 use numpy::ndarray::{Array1, Array2};
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use ordered_float::OrderedFloat;
+use pyo3::Bound;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
-use pyo3::Bound;
 use rustc_hash::FxHasher;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -166,7 +166,7 @@ fn evolve_by_circuit(
         coeffs_buffer: coeffs_buffer,
     };
 
-    let mut trunc_onenorm = 0.0;
+    let mut running_twonorm = 0.0;
     // Release the GIL and evolve the operator through the circuit
     let num_gates = thetas.len();
     py.detach(|| {
@@ -178,7 +178,7 @@ fn evolve_by_circuit(
             let theta = thetas[id];
             let gate = &gates[ints_per_pauli * id..(id + 1) * ints_per_pauli];
             let qarg = &qargs[id];
-            trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+            running_twonorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
         }
     });
 
@@ -192,7 +192,7 @@ fn evolve_by_circuit(
     Ok((
         output_paulis.into_pyarray(py).to_owned().into(),
         output_coeffs.into_pyarray(py).to_owned().into(),
-        trunc_onenorm,
+        running_twonorm.sqrt(),
     ))
 }
 
@@ -288,7 +288,7 @@ impl CPTOperatorRust {
         indices[..k].sort_unstable();
 
         // Compute the L1-norm of the truncated coefficients as we wish to return this later.
-        let mut trunc_onenorm = indices[k..].iter().map(|&i| self.coeffs[i].abs()).sum();
+        let mut twonorm_sum = indices[k..].iter().map(|&i| self.coeffs[i].powi(2)).sum();
 
         let ipp = self.ints_per_pauli;
         for &i in &indices[..k] {
@@ -298,7 +298,7 @@ impl CPTOperatorRust {
                     .extend_from_slice(&self.paulis[i * ipp..(i + 1) * ipp]);
                 self.coeffs_buffer.push(self.coeffs[i]);
             } else {
-                trunc_onenorm += c.abs();
+                twonorm_sum += c.powi(2);
             }
         }
 
@@ -306,7 +306,7 @@ impl CPTOperatorRust {
         std::mem::swap(&mut self.paulis, &mut self.paulis_buffer);
         std::mem::swap(&mut self.coeffs, &mut self.coeffs_buffer);
 
-        trunc_onenorm
+        twonorm_sum
     }
 
     /// Evolve self (`O`) through a Pauli rotation, `U(θ)`.
@@ -331,7 +331,7 @@ impl CPTOperatorRust {
             theta *= -1.0;
         }
 
-        let mut trunc_onenorm = 0.0;
+        let mut twonorm_sum = 0.0;
 
         // Get all the new terms to apply to the operator
         let mut new_terms: Vec<(Vec<u64>, f64)> = anticomm_ids
@@ -352,7 +352,6 @@ impl CPTOperatorRust {
                     }
                     return Some((new_pauli, new_coeff));
                 } else {
-                    trunc_onenorm += new_coeff.abs();
                     return None;
                 }
             })
@@ -366,12 +365,12 @@ impl CPTOperatorRust {
         // Apply the new terms to the operator. This method inherently de-duplicates.
         // The operator can outgrow `max_terms` here before being truncated in the
         // next step.
-        trunc_onenorm += self.insert_or_combine(&mut new_terms);
+        twonorm_sum += self.insert_or_combine(&mut new_terms);
 
         // Drop small terms and ensure the operator has fewer than max_terms terms
-        trunc_onenorm += self.truncate();
+        twonorm_sum += self.truncate();
 
-        trunc_onenorm
+        twonorm_sum
     }
 
     /// Insert new terms into the operator.
@@ -395,7 +394,7 @@ impl CPTOperatorRust {
         self.coeffs_buffer
             .reserve(self.coeffs.len() + new_terms.len());
 
-        let mut trunc_onenorm = 0.0;
+        let mut twonorm_sum = 0.0;
 
         // Stream the current operator (sorted), along w the sorted new terms into a new array
         let mut i = 0;
@@ -420,7 +419,7 @@ impl CPTOperatorRust {
                         self.paulis_buffer.extend_from_slice(existing);
                         self.coeffs_buffer.push(new_coeff);
                     } else {
-                        trunc_onenorm += new_coeff.abs();
+                        twonorm_sum += new_coeff.powi(2);
                     }
                     i += 1;
                     j += 1;
@@ -445,7 +444,7 @@ impl CPTOperatorRust {
         std::mem::swap(&mut self.paulis, &mut self.paulis_buffer);
         std::mem::swap(&mut self.coeffs, &mut self.coeffs_buffer);
 
-        trunc_onenorm
+        twonorm_sum
     }
 }
 
@@ -489,11 +488,7 @@ fn get_anticommuting(
                     anticomm_flag = !anticomm_flag;
                 }
             }
-            if anticomm_flag {
-                Some(pauli_id)
-            } else {
-                None
-            }
+            if anticomm_flag { Some(pauli_id) } else { None }
         })
         .collect()
 }
@@ -723,7 +718,7 @@ mod tests {
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
-        let trunc_onenorm_max_terms: f64 = cpt_op.truncate();
+        let trunc_twonorm_max_terms: f64 = cpt_op.truncate();
         assert_eq!(vec![1, 5, 6], cpt_op.paulis);
         assert_eq!(vec![-0.9, 0.55, -0.55], cpt_op.coeffs);
         assert!((trunc_onenorm_max_terms - 0.103).abs() < 1e-10);

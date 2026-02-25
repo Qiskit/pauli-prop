@@ -290,7 +290,7 @@ def propagate_through_rotation_gates(
 
     # Lexsort in preparation for rust evolution function
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
-    paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
+    paulis, coeffs, trunc_twonorm = evolve_by_circuit_r(
         pauli_arr[sorted_ids],
         operator.coeffs[sorted_ids].astype(np.float64),
         np.array(rot_gates.gates),
@@ -315,7 +315,7 @@ def propagate_through_rotation_gates(
             copy=False,
         )
 
-    return spo_out, trunc_onenorm
+    return spo_out, trunc_twonorm
 
 
 def propagate_through_circuit(
