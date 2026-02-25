@@ -288,7 +288,7 @@ impl CPTOperatorRust {
         indices[..k].sort_unstable();
 
         // Compute the L1-norm of the truncated coefficients as we wish to return this later.
-        let mut twonorm_sum = indices[k..].iter().map(|&i| self.coeffs[i].powi(2)).sum();
+        let twonorm_sum = indices[k..].iter().map(|&i| self.coeffs[i].powi(2)).sum();
 
         let ipp = self.ints_per_pauli;
         for &i in &indices[..k] {
@@ -297,8 +297,6 @@ impl CPTOperatorRust {
                 self.paulis_buffer
                     .extend_from_slice(&self.paulis[i * ipp..(i + 1) * ipp]);
                 self.coeffs_buffer.push(self.coeffs[i]);
-            } else {
-                twonorm_sum += c.powi(2);
             }
         }
 
@@ -394,7 +392,7 @@ impl CPTOperatorRust {
         self.coeffs_buffer
             .reserve(self.coeffs.len() + new_terms.len());
 
-        let mut twonorm_sum = 0.0;
+        let twonorm_sum = 0.0;
 
         // Stream the current operator (sorted), along w the sorted new terms into a new array
         let mut i = 0;
@@ -418,8 +416,6 @@ impl CPTOperatorRust {
                     if new_coeff.abs() > self.atol {
                         self.paulis_buffer.extend_from_slice(existing);
                         self.coeffs_buffer.push(new_coeff);
-                    } else {
-                        twonorm_sum += new_coeff.powi(2);
                     }
                     i += 1;
                     j += 1;
