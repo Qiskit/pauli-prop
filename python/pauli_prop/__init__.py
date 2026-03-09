@@ -18,7 +18,6 @@
 from .propagation import (
     RotationGates,
     circuit_to_rotation_gates,
-    circuit_to_noisy_rotation_gates,
     evolve_through_cliffords,
     propagate_through_circuit,
     propagate_through_noisy_rotation_gates,
@@ -29,7 +28,6 @@ from .propagation import (
 __all__ = [
     "RotationGates",
     "circuit_to_rotation_gates",
-    "circuit_to_noisy_rotation_gates",
     "evolve_through_cliffords",
     "propagate_through_circuit",
     "propagate_through_noisy_rotation_gates",

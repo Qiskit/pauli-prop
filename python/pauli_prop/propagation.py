@@ -150,11 +150,11 @@ class RotationGates(NamedTuple):
     thetas: list[float]
     """The rotation angles of all gates."""
     generators: list[npt.NDArray[np.bool_]] | None = None
-    """Pauli generators for Lindblad errors. None for backward compatibility."""
+    """Optional Pauli generators for Lindblad errors."""
     rates: list[float] | None = None
-    """Rates for each Lindblad error generator. None for backward compatibility."""
+    """Optional rates for each Lindblad error generator."""
     gate_types: list[int] | None = None
-    """Type of each gate: 0 for Pauli rotation, 1 for Lindblad error. None for backward compatibility."""
+    """Type of each gate: 0 for Pauli rotation, 1 for Lindblad error. None if circuit is noiseless."""
 
     def append_circuit_instruction(
         self,
@@ -220,40 +220,34 @@ def circuit_to_rotation_gates(
     """Converts the provided circuit to an intermediate representation.
 
     Args:
-        circuit: The circuit to convert. It may contain gates that are Pauli rotations or `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instances.
+        circuit: The circuit to convert. May contain Pauli rotations and optionally
+            `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instances.
 
     Returns:
-        The extracted rotation gate data.
+        The extracted rotation gate data. If the circuit contains Lindblad errors,
+        the returned RotationGates will include generators, rates, and gate_types fields.
+        Otherwise, these fields will be None for backward compatibility.
 
     Raises:
         ValueError: when an unsupported gate is encountered in ``circuit``.
     """
-    rot_gates = RotationGates([], [], [])
-    for data in circuit.data:
-        if data.name == "barrier":
-            continue
-        qargs = [circuit.find_bit(qubit).index for qubit in data.qubits]
-        rot_gates.append_circuit_instruction(data, qargs, circuit.num_qubits)
-    return rot_gates
-
-def circuit_to_noisy_rotation_gates(
-    circuit: QuantumCircuit,
-) -> RotationGates:
-    """Converts a circuit with Pauli-Lindblad errors to an intermediate representation.
-
-    This function handles circuits that may contain both Pauli rotation gates and
-    `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_
-    instances (as quantum_channel instructions).
-
-    Args:
-        circuit: The circuit to convert. May contain Pauli rotations and PauliLindbladError instances.
-
-    Returns:
-        The extracted rotation gate and Lindblad error data.
-
-    Raises:
-        ValueError: when an unsupported gate is encountered in ``circuit``.
-    """
+    # Check if circuit contains any Lindblad errors
+    has_lindblad = any(
+        inst.operation.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error")
+        for inst in circuit.data
+    )
+    
+    if not has_lindblad:
+        # Backward compatible path - only rotation gates, no noise fields
+        rot_gates = RotationGates([], [], [])
+        for data in circuit.data:
+            if data.name == "barrier":
+                continue
+            qargs = [circuit.find_bit(qubit).index for qubit in data.qubits]
+            rot_gates.append_circuit_instruction(data, qargs, circuit.num_qubits)
+        return rot_gates
+    
+    # Circuit has Lindblad errors - include full noise information
     gates = []
     qargs_list = []
     thetas = []
@@ -322,7 +316,6 @@ def circuit_to_noisy_rotation_gates(
         gate_types.append(0)  # Type 0 = Pauli rotation
     
     return RotationGates(gates, qargs_list, thetas, generators, rates, gate_types)
-
 
 
 def propagate_through_rotation_gates(
@@ -550,19 +543,14 @@ def propagate_through_circuit(
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
     """
-    # Check if circuit contains Pauli-Lindblad errors
-    has_lindblad_errors = any(
-        inst.operation.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error")
-        for inst in circuit.data
-    )
+    rot_gates = circuit_to_rotation_gates(circuit)
     
-    if has_lindblad_errors:
+    # Check if circuit contains Pauli-Lindblad errors (rot_gates will have noise fields populated)
+    if rot_gates.gate_types is not None:
         # Use noisy propagation for circuits with Lindblad errors
-        rot_gates = circuit_to_noisy_rotation_gates(circuit)
         return propagate_through_noisy_rotation_gates(operator, rot_gates, max_terms, atol, frame)
     else:
         # Use standard propagation for error-free circuits
-        rot_gates = circuit_to_rotation_gates(circuit)
         return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
 
 
