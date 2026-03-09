@@ -136,7 +136,18 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
 
 
 class RotationGates(NamedTuple):
-    """An intermediate minimal representation of a :class:`.QuantumCircuit`."""
+    """An intermediate minimal representation of a :class:`.QuantumCircuit`.
+
+    This class describes circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and Pauli-Lindblad
+    error specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindblad    Error>`_ instructions.
+
+    The Pauli rotations are specified by fields ``gates``, ``qargs``, and ``thetas``. The Pauli-Lindblad error instructions are stored as ``generators`` and
+    ``rates``. ``gate_types`` is a list of ``bool`` values which specifies the type of each input instruction (rotation gate or error channel).
+
+    In a noisy circuit, ordering of instructions is maintained by ``gate_types``. To iterate through each rotation/generator in order, one would generally
+    iterate over ``gate_types`` and access the instruction from the appropriate fields, based on its type. In a noiseless circuit, the ordering is trivially
+    preserved by thge ordering of ``gates``, ``qargs``, and ``thetas``.
+    """
 
     gates: list[npt.NDArray[np.bool_]]
     """A ZX-calculus-like representation of the gates."""
@@ -264,7 +275,7 @@ def circuit_to_rotation_gates(
 
     Args:
         circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`) and optionally
-            `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instances.
+            `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     Returns:
         The extracted rotation gate data. If the circuit contains Pauli-Lindblad errors,
@@ -296,9 +307,8 @@ def propagate_through_rotation_gates(
 
     For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
-    This function handles both noiseless circuits (Pauli rotations only) and noisy circuits
-    (with Pauli-Lindblad error channels). The presence of noise is automatically detected from
-    the ``rot_gates`` structure.
+    This function handles both noiseless circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`)
+    and noisy circuits containing `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
@@ -316,8 +326,7 @@ def propagate_through_rotation_gates(
 
     Args:
         operator: The operator to propagate
-        rot_gates: The circuit represented in the form of :class:`.RotationGates` (see also :func:`.circuit_to_rotation_gates`).
-            May contain Pauli-Lindblad error information.
+        rot_gates: A circuit represented in the form of :class:`.RotationGates`.
         max_terms: The maximum number of terms the operator may contain as it is propagated
         atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated. This parameter is not a
             guarantee on the accuracy of the returned operator.
@@ -326,7 +335,7 @@ def propagate_through_rotation_gates(
             ``h`` for Heisenberg evolution
 
     Returns:
-        The evolved operator and truncation norm
+        The evolved operator and one-norm of all truncated coefficients.
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.

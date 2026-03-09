@@ -7,10 +7,10 @@ use num_complex::{Complex, ComplexFloat};
 use numpy::ndarray::{Array1, Array2};
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use ordered_float::OrderedFloat;
+use pyo3::Bound;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
-use pyo3::Bound;
 use rustc_hash::FxHasher;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -147,7 +147,7 @@ fn evolve_by_circuit(
     operator: PyReadonlyArray2<bool>,
     coeffs: PyReadonlyArray1<f64>,
     gates: PyReadonlyArray2<bool>,
-    qargs: Vec<Vec<usize>>,
+    qargs: Vec<Vec<Vec<usize>>>,
     thetas: Vec<f64>,
     gate_types: Vec<bool>,
     generators: Vec<Vec<PyReadonlyArray1<bool>>>,
@@ -165,25 +165,31 @@ fn evolve_by_circuit(
     let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
     let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
     let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
-    
+
     // Convert generators from PyReadonlyArray to Vec<Vec<Vec<u64>>> before detaching
     // This is necessary because PyReadonlyArray is not Send and cannot cross thread boundaries
-    let generators_converted: Vec<Vec<Vec<u64>>> = generators.iter().map(|gen_list| {
-        gen_list.iter().map(|gen_array| {
-            // Convert each generator array to Vec<u64> format
-            let gen_2d = gen_array.as_array();
-            let gen_flat: Vec<bool> = gen_2d.iter().copied().collect();
-            
-            // Pack bools into u64s (same as np_to_cpt but for 1D array)
-            let mut result = vec![0u64; ints_per_pauli];
-            for (i, &val) in gen_flat.iter().enumerate() {
-                if val {
-                    result[i / 64] |= 1u64 << (i % 64);
-                }
-            }
-            result
-        }).collect()
-    }).collect();
+    let generators_converted: Vec<Vec<Vec<u64>>> = generators
+        .iter()
+        .map(|gen_list| {
+            gen_list
+                .iter()
+                .map(|gen_array| {
+                    // Convert each generator array to Vec<u64> format
+                    let gen_2d = gen_array.as_array();
+                    let gen_flat: Vec<bool> = gen_2d.iter().copied().collect();
+
+                    // Pack bools into u64s (same as np_to_cpt but for 1D array)
+                    let mut result = vec![0u64; ints_per_pauli];
+                    for (i, &val) in gen_flat.iter().enumerate() {
+                        if val {
+                            result[i / 64] |= 1u64 << (i % 64);
+                        }
+                    }
+                    result
+                })
+                .collect()
+        })
+        .collect();
 
     // Instantiate the internal operator
     let mut cpt_op = CPTOperatorRust {
@@ -198,37 +204,37 @@ fn evolve_by_circuit(
     };
 
     let mut trunc_onenorm = 0.0;
-    
+
     // Determine number of instructions based on gate_types or gates
     let num_instructions = if gate_types.is_empty() {
-        thetas.len()  // Backward compatibility: all are Pauli rotations
+        thetas.len() // Backward compatibility: all are Pauli rotations
     } else {
         gate_types.len()
     };
-    
+
     // Release the GIL and evolve the operator through the circuit
     py.detach(|| {
         let mut gate_idx = 0;
         let mut lindblad_idx = 0;
-        
+
         for i in 0..num_instructions {
             let mut id = i;
             if frame == 'h' {
                 id = num_instructions - 1 - i
             };
-            
+
             // Determine instruction type
             let is_lindblad = if gate_types.is_empty() {
-                false  // Backward compatibility: all rotations
+                false // Backward compatibility: all rotations
             } else {
                 gate_types[id]
             };
-            
+
             if !is_lindblad {
                 // Standard Pauli rotation
                 let theta = thetas[gate_idx];
                 let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
-                // For rotations, qargs[id] is a single-element list
+                // For rotations, qargs[id] is a single-element list containing one Vec<usize>
                 let qarg = &qargs[id][0];
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 gate_idx += 1;
@@ -236,7 +242,7 @@ fn evolve_by_circuit(
                 // Pauli-Lindblad error - placeholder implementation (no-op for now)
                 let _gen_list = &generators_converted[lindblad_idx];
                 let _rate_list = &rates[lindblad_idx];
-                let _qargs_list = &qargs[id];  // List of qargs, one per generator
+                let _qargs_list = &qargs[id]; // List of Vec<usize>, one per generator
                 // TODO: Implement actual Pauli-Lindblad evolution
                 // For now, this is a no-op (identity channel)
                 // The operator passes through unchanged
@@ -552,11 +558,7 @@ fn get_anticommuting(
                     anticomm_flag = !anticomm_flag;
                 }
             }
-            if anticomm_flag {
-                Some(pauli_id)
-            } else {
-                None
-            }
+            if anticomm_flag { Some(pauli_id) } else { None }
         })
         .collect()
 }
