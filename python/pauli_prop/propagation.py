@@ -136,17 +136,12 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
 
 
 class RotationGates(NamedTuple):
-    """An intermediate minimal representation of a :class:`.QuantumCircuit`.
-
-    During :func:`.propagate_through_circuit` the :class:`.QuantumCircuit` gets converted into a sequence of
-    rotation gates, extracting the parameters and acted-upon qubit indices. These data structures
-    can be passed to the Rust-accelerated internal function in a straight forward manner.
-    """
+    """An intermediate minimal representation of a :class:`.QuantumCircuit`."""
 
     gates: list[npt.NDArray[np.bool_]]
     """A ZX-calculus-like representation of the gates."""
-    qargs: list[list[int]]
-    """The qubit indices acted upon by each gate."""
+    qargs: list[list[tuple[int, ...]]]
+    """The qubit indices acted upon by each instruction. For rotations: single-element list. For Lindblad errors: list of tuples (one per generator)."""
     thetas: list[float]
     """The rotation angles of all gates."""
     generators: list[list[npt.NDArray[np.bool_]]] | None = None
@@ -166,15 +161,15 @@ class RotationGates(NamedTuple):
     ) -> None:
         """Parses a circuit instruction and appends its data to the internal lists.
 
-        Supports Pauli rotation gates (e.g. 'rx', 'ry', 'rz', 'PauliEvolutionGate') and Pauli-Lindblad
-        errors channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
+        Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+        error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
         Args:
             inst: The circuit instruction to parse and append
             qargs: The list of qubit indices of the instruction in the context of its circuit
             num_qubits: The number of qubits of the circuit containing this instruction
-            clifford: An optional Clifford through which the provided instruction should be moved.
-                The Clifford must act on all qubits in the circuit.
+            clifford: An optional Clifford through which the provided instruction should be moved. The instruction will be evolved
+                forward (Schrödinger frame) through the Clifford. The Clifford must act on all qubits in the circuit.
 
         Raises:
             ValueError: Unsupported gate encountered in circuit
@@ -187,7 +182,7 @@ class RotationGates(NamedTuple):
         if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
             error = inst.operation._quantum_error
             if not isinstance(error, PauliLindbladError):
-                raise ValueError(f"Unknown quantum error type ({error.type}). Expected PauliLindbladError instance from Qiskit Aer.")
+                raise ValueError(f"Unknown quantum error type ({error.type}). Expected qiskit_aer.noise.PauliLindbladError.")
             # Initialize noise fields if this is the first Lindblad error
             if self.generators is None:
                 object.__setattr__(self, 'generators', [])
@@ -203,19 +198,19 @@ class RotationGates(NamedTuple):
             if clifford is not None:
                 error_generators = error_generators.evolve(clifford, frame="s")
             
-            # Collect all generators and rates for this PauliLindbladError
+            # Collect all generators, rates, and qargs for this PauliLindbladError
             gen_list = []
             rate_list = []
+            qargs_list = []
             for gen_idx, generator in enumerate(error_generators):
-                gate_arr = np.concatenate((generator.x, generator.z))
-                gen_list.append(gate_arr)
+                gen_arr = np.concatenate((generator.x, generator.z))
+                gen_qargs = np.where(generator.z | generator.x)[0].tolist()
+                gen_list.append(gen_arr)
                 rate_list.append(float(error.rates[gen_idx]))
+                qargs_list.append(tuple(gen_qargs))
             
-            # Store qargs for this Lindblad error instruction
-            gen_qargs = np.where(error_generators[0].z | error_generators[0].x)[0].tolist()
-            self.qargs.append(gen_qargs)
-            
-            # Append the entire list of generators and rates
+            # Append the entire list of generators, rates, and qargs
+            self.qargs.append(qargs_list)
             self.generators.append(gen_list)
             self.rates.append(rate_list)
             self.gate_types.append(True)
@@ -252,7 +247,9 @@ class RotationGates(NamedTuple):
         gate_arr = np.concatenate((rotation_pauli.x, rotation_pauli.z))
 
         self.gates.append(gate_arr)
-        self.qargs.append(qargs)
+        # For consistency with Lindblad errors, wrap qargs in a single-element list
+        # This makes qargs always list[list[tuple]] for uniform Rust interface
+        self.qargs.append([tuple(qargs)])
         self.thetas.append(theta)
         
         # If noise fields are initialized, mark this as a Pauli rotation

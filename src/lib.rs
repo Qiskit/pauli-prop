@@ -228,13 +228,15 @@ fn evolve_by_circuit(
                 // Standard Pauli rotation
                 let theta = thetas[gate_idx];
                 let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
-                let qarg = &qargs[id];
+                // For rotations, qargs[id] is a single-element list
+                let qarg = &qargs[id][0];
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 gate_idx += 1;
             } else {
                 // Lindblad error - placeholder implementation (no-op for now)
                 let _gen_list = &generators_converted[lindblad_idx];
                 let _rate_list = &rates[lindblad_idx];
+                let _qargs_list = &qargs[id];  // List of qargs, one per generator
                 // TODO: Implement actual Lindblad evolution
                 // For now, this is a no-op (identity channel)
                 // The operator passes through unchanged
