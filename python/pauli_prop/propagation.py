@@ -141,15 +141,15 @@ class RotationGates(NamedTuple):
     gates: list[npt.NDArray[np.bool_]]
     """A ZX-calculus-like representation of the gates."""
     qargs: list[list[tuple[int, ...]]]
-    """The qubit indices acted upon by each instruction. For rotations: single-element list. For Lindblad errors: list of tuples (one per generator)."""
+    """The qubit indices acted upon by each instruction. For rotations: single-element list. For Pauli-Lindblad errors: list of tuples (one per generator)."""
     thetas: list[float]
     """The rotation angles of all gates."""
     generators: list[list[npt.NDArray[np.bool_]]] | None = None
-    """Lindblad error generators (list of generator lists, one per PauliLindbladError instruction)."""
+    """Pauli-Lindblad error generators (list of generator lists, one per PauliLindbladError instruction)."""
     rates: list[list[float]] | None = None
-    """Lindblad error rates (list of rate lists, one per PauliLindbladError instruction)."""
+    """Pauli-Lindblad error rates (list of rate lists, one per PauliLindbladError instruction)."""
     gate_types: list[bool] | None = None
-    """Instruction type: False = Pauli rotation (from gates), True = Lindblad error (from generators/rates)."""
+    """Instruction type: False = Pauli rotation (from gates), True = Pauli-Lindblad error (from generators/rates)."""
 
     def append_circuit_instruction(
         self,
@@ -178,12 +178,12 @@ class RotationGates(NamedTuple):
         if (clifford is not None) and (clifford.num_qubits != num_qubits):
             raise ValueError("Clifford must act on all qubits in circuit.")
 
-        # Check if this is a Lindblad error
+        # Check if this is a Pauli-Lindblad error
         if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
             error = inst.operation._quantum_error
             if not isinstance(error, PauliLindbladError):
                 raise ValueError(f"Unknown quantum error type ({error.type}). Expected qiskit_aer.noise.PauliLindbladError.")
-            # Initialize noise fields if this is the first Lindblad error
+            # Initialize noise fields if this is the first Pauli-Lindblad error
             if self.generators is None:
                 object.__setattr__(self, 'generators', [])
                 object.__setattr__(self, 'rates', [])
@@ -247,7 +247,7 @@ class RotationGates(NamedTuple):
         gate_arr = np.concatenate((rotation_pauli.x, rotation_pauli.z))
 
         self.gates.append(gate_arr)
-        # For consistency with Lindblad errors, wrap qargs in a single-element list
+        # For consistency with Pauli-Lindblad errors, wrap qargs in a single-element list
         # This makes qargs always list[list[tuple]] for uniform Rust interface
         self.qargs.append([tuple(qargs)])
         self.thetas.append(theta)
@@ -267,7 +267,7 @@ def circuit_to_rotation_gates(
             `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instances.
 
     Returns:
-        The extracted rotation gate data. If the circuit contains Lindblad errors,
+        The extracted rotation gate data. If the circuit contains Pauli-Lindblad errors,
         the returned RotationGates will include generators, rates, and gate_types fields.
         Otherwise, these fields will be None for backward compatibility.
 
@@ -343,7 +343,7 @@ def propagate_through_rotation_gates(
     # Lexsort in preparation for rust evolution function
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
     
-    # For circuits without Lindblad errors, pass empty lists
+    # For circuits without Pauli-Lindblad errors, pass empty lists
     gate_types = rot_gates.gate_types if rot_gates.gate_types is not None else []
     generators = rot_gates.generators if rot_gates.generators is not None else []
     rates = rot_gates.rates if rot_gates.rates is not None else []
@@ -397,7 +397,7 @@ def propagate_through_noisy_rotation_gates(
 
     Args:
         operator: The operator to propagate
-        rot_gates: The circuit with Lindblad errors, created by :func:`.circuit_to_noisy_rotation_gates`
+        rot_gates: The circuit with Pauli-Lindblad errors, created by :func:`.circuit_to_noisy_rotation_gates`
         max_terms: The maximum number of terms the operator may contain as it is propagated
         atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated
         frame:
@@ -411,7 +411,7 @@ def propagate_through_noisy_rotation_gates(
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
-        ValueError: ``rot_gates`` does not contain Lindblad error information.
+        ValueError: ``rot_gates`` does not contain Pauli-Lindblad error information.
     """
     if max_terms < 1:
         raise ValueError("max_terms must be a positive integer.")
@@ -422,7 +422,7 @@ def propagate_through_noisy_rotation_gates(
     if frame not in ["h", "s"]:
         raise ValueError(f"frame must be 'h' or 's', not {frame}.")
     if rot_gates.gate_types is None or rot_gates.rates is None:
-        raise ValueError("rot_gates must contain Lindblad error information. Use circuit_to_noisy_rotation_gates().")
+        raise ValueError("rot_gates must contain Pauli-Lindblad error information. Use circuit_to_noisy_rotation_gates().")
 
     operator = operator.simplify(atol=atol)
     pauli_arr = np.concatenate([operator.paulis.x, operator.paulis.z], axis=1)
@@ -513,7 +513,7 @@ def propagate_through_circuit(
     
     # Check if circuit contains Pauli-Lindblad errors (rot_gates will have noise fields populated)
     if rot_gates.gate_types is not None:
-        # Use noisy propagation for circuits with Lindblad errors
+        # Use noisy propagation for circuits with Pauli-Lindblad errors
         return propagate_through_noisy_rotation_gates(operator, rot_gates, max_terms, atol, frame)
     else:
         # Use standard propagation for error-free circuits

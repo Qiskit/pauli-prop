@@ -129,14 +129,14 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 ///
 /// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
 ///
-/// `gate_types` indicates the type of each instruction: false for Pauli rotation, true for Lindblad error.
+/// `gate_types` indicates the type of each instruction: false for Pauli rotation, true for Pauli-Lindblad error.
 /// Empty list means all gates are Pauli rotations (backward compatibility).
 ///
-/// `generators` contains the Pauli generators for Lindblad errors (nested: one inner list per PauliLindbladError).
-/// Empty list means no Lindblad errors.
+/// `generators` contains the Pauli generators for Pauli-Lindblad errors (nested: one inner list per PauliLindbladError).
+/// Empty list means no Pauli-Lindblad errors.
 ///
-/// `rates` contains the rates for Lindblad error generators (nested: one inner list per PauliLindbladError).
-/// Empty list means no Lindblad errors.
+/// `rates` contains the rates for Pauli-Lindblad error generators (nested: one inner list per PauliLindbladError).
+/// Empty list means no Pauli-Lindblad errors.
 ///
 /// `frame` can be:
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
@@ -233,11 +233,11 @@ fn evolve_by_circuit(
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 gate_idx += 1;
             } else {
-                // Lindblad error - placeholder implementation (no-op for now)
+                // Pauli-Lindblad error - placeholder implementation (no-op for now)
                 let _gen_list = &generators_converted[lindblad_idx];
                 let _rate_list = &rates[lindblad_idx];
                 let _qargs_list = &qargs[id];  // List of qargs, one per generator
-                // TODO: Implement actual Lindblad evolution
+                // TODO: Implement actual Pauli-Lindblad evolution
                 // For now, this is a no-op (identity channel)
                 // The operator passes through unchanged
                 lindblad_idx += 1;
