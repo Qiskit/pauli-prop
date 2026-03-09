@@ -149,12 +149,12 @@ class RotationGates(NamedTuple):
     """The qubit indices acted upon by each gate."""
     thetas: list[float]
     """The rotation angles of all gates."""
-    generators: list[npt.NDArray[np.bool_]] | None = None
-    """Optional Pauli generators for Lindblad errors."""
-    rates: list[float] | None = None
-    """Optional rates for each Lindblad error generator."""
-    gate_types: list[int] | None = None
-    """Type of each gate: 0 for Pauli rotation, 1 for Lindblad error. None if circuit is noiseless."""
+    generators: list[list[npt.NDArray[np.bool_]]] | None = None
+    """Lindblad error generators (list of generator lists, one per PauliLindbladError instruction)."""
+    rates: list[list[float]] | None = None
+    """Lindblad error rates (list of rate lists, one per PauliLindbladError instruction)."""
+    gate_types: list[bool] | None = None
+    """Instruction type: False = Pauli rotation (from gates), True = Lindblad error (from generators/rates)."""
 
     def append_circuit_instruction(
         self,
@@ -166,8 +166,8 @@ class RotationGates(NamedTuple):
     ) -> None:
         """Parses a circuit instruction and appends its data to the internal lists.
 
-        Handles both Pauli rotation gates and Lindblad errors. If this is the first
-        Lindblad error added, the optional noise fields will be initialized.
+        Supports Pauli rotation gates (e.g. 'rx', 'ry', 'rz', 'PauliEvolutionGate') and Pauli-Lindblad
+        errors channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
         Args:
             inst: The circuit instruction to parse and append
@@ -186,36 +186,40 @@ class RotationGates(NamedTuple):
         # Check if this is a Lindblad error
         if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
             error = inst.operation._quantum_error
-            if isinstance(error, PauliLindbladError):
-                # Initialize noise fields if this is the first Lindblad error
-                if self.generators is None:
-                    # Convert existing gates to have noise metadata
-                    num_existing = len(self.gates)
-                    object.__setattr__(self, 'generators', list(self.gates))
-                    object.__setattr__(self, 'rates', [0.0] * num_existing)
-                    object.__setattr__(self, 'gate_types', [0] * num_existing)
-                
-                # Expand generators to full circuit width
-                id_pauli = Pauli("I" * num_qubits)
-                error_generators = PauliList([id_pauli] * len(error.generators))
-                error_generators.dot(error.generators, qargs=qargs, inplace=True)
-                
-                # Evolve through Clifford if provided
-                if clifford is not None:
-                    error_generators = error_generators.evolve(clifford, frame="s")
-                
-                # Add each generator as a separate entry
-                for gen_idx, generator in enumerate(error_generators):
-                    gen_qargs = np.where(generator.z | generator.x)[0].tolist()
-                    gate_arr = np.concatenate((generator.x, generator.z))
-                    
-                    self.gates.append(gate_arr)
-                    self.qargs.append(gen_qargs)
-                    self.thetas.append(0.0)
-                    self.generators.append(gate_arr)
-                    self.rates.append(float(error.rates[gen_idx]))
-                    self.gate_types.append(1)
-                return
+            if not isinstance(error, PauliLindbladError):
+                raise ValueError(f"Unknown quantum error type ({error.type}). Expected PauliLindbladError instance from Qiskit Aer.")
+            # Initialize noise fields if this is the first Lindblad error
+            if self.generators is None:
+                object.__setattr__(self, 'generators', [])
+                object.__setattr__(self, 'rates', [])
+                object.__setattr__(self, 'gate_types', [False] * len(self.gates))
+            
+            # Expand generators to full circuit width
+            id_pauli = Pauli("I" * num_qubits)
+            error_generators = PauliList([id_pauli] * len(error.generators))
+            error_generators.dot(error.generators, qargs=qargs, inplace=True)
+            
+            # Evolve through Clifford if provided
+            if clifford is not None:
+                error_generators = error_generators.evolve(clifford, frame="s")
+            
+            # Collect all generators and rates for this PauliLindbladError
+            gen_list = []
+            rate_list = []
+            for gen_idx, generator in enumerate(error_generators):
+                gate_arr = np.concatenate((generator.x, generator.z))
+                gen_list.append(gate_arr)
+                rate_list.append(float(error.rates[gen_idx]))
+            
+            # Store qargs for this Lindblad error instruction
+            gen_qargs = np.where(error_generators[0].z | error_generators[0].x)[0].tolist()
+            self.qargs.append(gen_qargs)
+            
+            # Append the entire list of generators and rates
+            self.generators.append(gen_list)
+            self.rates.append(rate_list)
+            self.gate_types.append(True)
+            return
 
         # Handle Pauli rotation gates
         theta = inst.operation.params[0]
@@ -251,12 +255,9 @@ class RotationGates(NamedTuple):
         self.qargs.append(qargs)
         self.thetas.append(theta)
         
-        # If noise fields are initialized, append to them as well
-        if self.generators is not None:
-            assert self.rates is not None and self.gate_types is not None
-            self.generators.append(gate_arr)
-            self.rates.append(0.0)
-            self.gate_types.append(0)
+        # If noise fields are initialized, mark this as a Pauli rotation
+        if self.gate_types is not None:
+            self.gate_types.append(False)
 
 
 def circuit_to_rotation_gates(
@@ -276,91 +277,13 @@ def circuit_to_rotation_gates(
     Raises:
         ValueError: when an unsupported gate is encountered in ``circuit``.
     """
-    # Check if circuit contains any Lindblad errors
-    has_lindblad = any(
-        inst.operation.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error")
-        for inst in circuit.data
-    )
-    
-    if not has_lindblad:
-        # Backward compatible path - only rotation gates, no noise fields
-        rot_gates = RotationGates([], [], [])
-        for data in circuit.data:
-            if data.name == "barrier":
-                continue
-            qargs = [circuit.find_bit(qubit).index for qubit in data.qubits]
-            rot_gates.append_circuit_instruction(data, qargs, circuit.num_qubits)
-        return rot_gates
-    
-    # Circuit has Lindblad errors - include full noise information
-    gates = []
-    qargs_list = []
-    thetas = []
-    generators = []
-    rates = []
-    gate_types = []
-    
-    id_pauli = Pauli("I" * circuit.num_qubits)
-    
+    rot_gates = RotationGates([], [], [])
     for data in circuit.data:
         if data.name == "barrier":
             continue
-            
         qargs = [circuit.find_bit(qubit).index for qubit in data.qubits]
-        
-        # Check if this is a Lindblad error
-        if data.name == "quantum_channel" and hasattr(data.operation, "_quantum_error"):
-            error = data.operation._quantum_error
-            if isinstance(error, PauliLindbladError):
-                # Handle Lindblad error with multiple generators
-                error_generators = PauliList([id_pauli] * len(error.generators))
-                error_generators.dot(error.generators, qargs=qargs, inplace=True)
-                
-                # Add each generator as a separate entry
-                for gen_idx, generator in enumerate(error_generators):
-                    # Find qubits where this generator acts (non-identity)
-                    gen_qargs = np.where(generator.z | generator.x)[0].tolist()
-                    gate_arr = np.concatenate((generator.x, generator.z))
-                    
-                    gates.append(gate_arr)
-                    qargs_list.append(gen_qargs)
-                    thetas.append(0.0)  # No rotation angle for Lindblad
-                    generators.append(gate_arr)  # Store generator
-                    rates.append(float(error.rates[gen_idx]))
-                    gate_types.append(1)  # Type 1 = Lindblad error
-                continue
-        
-        # Handle regular Pauli rotation gates
-        theta = data.operation.params[0]
-        if not isinstance(data.operation, PauliEvolutionGate):
-            if data.name not in _ROTATION_TO_GENERATOR:
-                raise ValueError(f"Encountered unsupported gate: {data.name}")
-            gate = SparsePauliOp.from_operator(Operator(data.operation))
-            rotation_pauli = gate.paulis[np.any((gate.paulis.z | gate.paulis.x), axis=1)]
-            # Paulis w 0.0 rotation angles may not contain a Pauli term, so ignore them
-            if len(rotation_pauli) == 0:
-                continue
-            assert len(rotation_pauli) == 1
-            rotation_pauli = rotation_pauli[0]
-        else:
-            assert len(data.operation.operator.paulis) == 1
-            rotation_pauli = data.operation.operator.paulis[0]
-            theta *= 2.0
-
-        rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=circuit.num_qubits)
-        assert rotation_pauli.phase == 0
-
-        qargs = np.where(rotation_pauli.z | rotation_pauli.x)[0].tolist()
-        gate_arr = np.concatenate((rotation_pauli.x, rotation_pauli.z))
-
-        gates.append(gate_arr)
-        qargs_list.append(qargs)
-        thetas.append(theta)
-        generators.append(gate_arr)  # For rotations, generator is the same as gate
-        rates.append(0.0)  # No rate for rotations
-        gate_types.append(0)  # Type 0 = Pauli rotation
-    
-    return RotationGates(gates, qargs_list, thetas, generators, rates, gate_types)
+        rot_gates.append_circuit_instruction(data, qargs, circuit.num_qubits)
+    return rot_gates
 
 
 def propagate_through_rotation_gates(
@@ -423,10 +346,10 @@ def propagate_through_rotation_gates(
     # Lexsort in preparation for rust evolution function
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
     
-    # For backward compatibility: create gate_types (all 0s) and empty lindblad_rates
-    num_gates = len(rot_gates.gates)
-    gate_types = [0] * num_gates  # All Pauli rotations
-    lindblad_rates = [[]] * num_gates  # Empty rates for all gates
+    # For circuits without Lindblad errors, pass empty lists
+    gate_types = rot_gates.gate_types if rot_gates.gate_types is not None else []
+    generators = rot_gates.generators if rot_gates.generators is not None else []
+    rates = rot_gates.rates if rot_gates.rates is not None else []
     
     paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
         pauli_arr[sorted_ids],
@@ -435,7 +358,8 @@ def propagate_through_rotation_gates(
         rot_gates.qargs,
         rot_gates.thetas,
         gate_types,
-        lindblad_rates,
+        generators,
+        rates,
         max_terms,
         atol,
         frame.lower(),

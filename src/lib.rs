@@ -129,10 +129,14 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 ///
 /// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
 ///
-/// `gate_types` indicates the type of each gate: 0 for Pauli rotation, 1 for Lindblad error.
+/// `gate_types` indicates the type of each instruction: false for Pauli rotation, true for Lindblad error.
+/// Empty list means all gates are Pauli rotations (backward compatibility).
 ///
-/// `lindblad_rates` contains the rates for each Lindblad error generator.
-/// For rotation gates, the corresponding entry should be an empty vector.
+/// `generators` contains the Pauli generators for Lindblad errors (nested: one inner list per PauliLindbladError).
+/// Empty list means no Lindblad errors.
+///
+/// `rates` contains the rates for Lindblad error generators (nested: one inner list per PauliLindbladError).
+/// Empty list means no Lindblad errors.
 ///
 /// `frame` can be:
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
@@ -145,8 +149,9 @@ fn evolve_by_circuit(
     gates: PyReadonlyArray2<bool>,
     qargs: Vec<Vec<usize>>,
     thetas: Vec<f64>,
-    gate_types: Vec<u8>,
-    lindblad_rates: Vec<Vec<f64>>,
+    gate_types: Vec<bool>,
+    generators: Vec<Vec<PyReadonlyArray1<bool>>>,
+    rates: Vec<Vec<f64>>,
     max_terms: usize,
     atol: f64,
     frame: char,
@@ -160,6 +165,25 @@ fn evolve_by_circuit(
     let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
     let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
     let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
+    
+    // Convert generators from PyReadonlyArray to Vec<Vec<Vec<u64>>> before detaching
+    // This is necessary because PyReadonlyArray is not Send and cannot cross thread boundaries
+    let generators_converted: Vec<Vec<Vec<u64>>> = generators.iter().map(|gen_list| {
+        gen_list.iter().map(|gen_array| {
+            // Convert each generator array to Vec<u64> format
+            let gen_2d = gen_array.as_array();
+            let gen_flat: Vec<bool> = gen_2d.iter().copied().collect();
+            
+            // Pack bools into u64s (same as np_to_cpt but for 1D array)
+            let mut result = vec![0u64; ints_per_pauli];
+            for (i, &val) in gen_flat.iter().enumerate() {
+                if val {
+                    result[i / 64] |= 1u64 << (i % 64);
+                }
+            }
+            result
+        }).collect()
+    }).collect();
 
     // Instantiate the internal operator
     let mut cpt_op = CPTOperatorRust {
@@ -174,28 +198,47 @@ fn evolve_by_circuit(
     };
 
     let mut trunc_onenorm = 0.0;
+    
+    // Determine number of instructions based on gate_types or gates
+    let num_instructions = if gate_types.is_empty() {
+        thetas.len()  // Backward compatibility: all are Pauli rotations
+    } else {
+        gate_types.len()
+    };
+    
     // Release the GIL and evolve the operator through the circuit
-    let num_gates = thetas.len();
     py.detach(|| {
-        for i in 0..num_gates {
+        let mut gate_idx = 0;
+        let mut lindblad_idx = 0;
+        
+        for i in 0..num_instructions {
             let mut id = i;
             if frame == 'h' {
-                id = num_gates - 1 - i
+                id = num_instructions - 1 - i
             };
-            let gate_type = gate_types[id];
-            let theta = thetas[id];
-            let gate = &gates[ints_per_pauli * id..(id + 1) * ints_per_pauli];
-            let qarg = &qargs[id];
             
-            if gate_type == 0 {
+            // Determine instruction type
+            let is_lindblad = if gate_types.is_empty() {
+                false  // Backward compatibility: all rotations
+            } else {
+                gate_types[id]
+            };
+            
+            if !is_lindblad {
                 // Standard Pauli rotation
+                let theta = thetas[gate_idx];
+                let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
+                let qarg = &qargs[id];
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
-            } else if gate_type == 1 {
+                gate_idx += 1;
+            } else {
                 // Lindblad error - placeholder implementation (no-op for now)
-                let _rate = lindblad_rates[id][0]; // Validate that rate exists
+                let _gen_list = &generators_converted[lindblad_idx];
+                let _rate_list = &rates[lindblad_idx];
                 // TODO: Implement actual Lindblad evolution
                 // For now, this is a no-op (identity channel)
                 // The operator passes through unchanged
+                lindblad_idx += 1;
             }
         }
     });
