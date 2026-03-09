@@ -215,10 +215,13 @@ fn evolve_by_circuit(
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 gate_idx += 1;
             } else {
-                // Pauli-Lindblad error placeholder implementation (no-op for now)
-                let _gen_arr = &generators_converted[pl_error_idx];
-                let _rate_arr = &rates[pl_error_idx];
-                let _qargs_arr = &qargs[id];
+                // Pauli-Lindblad error: apply decoherence based on anticommutation
+                let gen_list = &generators_converted[pl_error_idx];
+                let rate_list = &rates[pl_error_idx];
+                let qargs_list = &qargs[id];
+
+                cpt_op.evolve_by_pauli_lindblad_error(gen_list, rate_list, qargs_list);
+
                 pl_error_idx += 1;
             }
         }
@@ -443,6 +446,35 @@ impl CPTOperatorRust {
         trunc_onenorm += self.truncate();
 
         trunc_onenorm
+    }
+
+    /// Evolve the operator through a Pauli-Lindblad error channel.
+    ///
+    /// For each generator in the error channel, terms that anticommute with the generator
+    /// are damped by a factor of exp(-2 * rate).
+    fn evolve_by_pauli_lindblad_error(
+        &mut self,
+        generators: &[Vec<u64>],
+        rates: &[f64],
+        qargs_list: &[Vec<usize>],
+    ) {
+        let ipp = self.ints_per_pauli;
+
+        // Apply damping directly for each generator
+        // This avoids any intermediate data structures
+        for (gen_idx, generator) in generators.iter().enumerate() {
+            let gen_qargs = &qargs_list[gen_idx];
+
+            // Get indices of operator terms that anticommute with this generator
+            let anticomm_ids =
+                get_anticommuting(&self.paulis, generator, gen_qargs, self.num_qubits, ipp);
+
+            // Apply damping factor exp(-2 * rate) to each anticommuting term
+            let damping = (-2.0 * rates[gen_idx]).exp();
+            for &term_idx in &anticomm_ids {
+                self.coeffs[term_idx] *= damping;
+            }
+        }
     }
 
     /// Insert new terms into the operator.
