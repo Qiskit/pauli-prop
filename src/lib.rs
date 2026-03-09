@@ -210,12 +210,11 @@ fn evolve_by_circuit(
                 // Standard Pauli rotation
                 let theta = thetas[gate_idx];
                 let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
-                // For rotations, qargs[id] is a single-element array containing one Vec<usize>
                 let qarg = &qargs[id][0];
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 gate_idx += 1;
             } else {
-                // Pauli-Lindblad error: apply decoherence based on anticommutation
+                // Pauli-Lindblad error
                 let gen_list = &generators_converted[pl_error_idx];
                 let rate_list = &rates[pl_error_idx];
                 let qargs_list = &qargs[id];
