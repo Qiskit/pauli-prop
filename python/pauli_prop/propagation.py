@@ -166,6 +166,9 @@ class RotationGates(NamedTuple):
     ) -> None:
         """Parses a circuit instruction and appends its data to the internal lists.
 
+        Handles both Pauli rotation gates and Lindblad errors. If this is the first
+        Lindblad error added, the optional noise fields will be initialized.
+
         Args:
             inst: The circuit instruction to parse and append
             qargs: The list of qubit indices of the instruction in the context of its circuit
@@ -180,6 +183,41 @@ class RotationGates(NamedTuple):
         if (clifford is not None) and (clifford.num_qubits != num_qubits):
             raise ValueError("Clifford must act on all qubits in circuit.")
 
+        # Check if this is a Lindblad error
+        if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
+            error = inst.operation._quantum_error
+            if isinstance(error, PauliLindbladError):
+                # Initialize noise fields if this is the first Lindblad error
+                if self.generators is None:
+                    # Convert existing gates to have noise metadata
+                    num_existing = len(self.gates)
+                    object.__setattr__(self, 'generators', list(self.gates))
+                    object.__setattr__(self, 'rates', [0.0] * num_existing)
+                    object.__setattr__(self, 'gate_types', [0] * num_existing)
+                
+                # Expand generators to full circuit width
+                id_pauli = Pauli("I" * num_qubits)
+                error_generators = PauliList([id_pauli] * len(error.generators))
+                error_generators.dot(error.generators, qargs=qargs, inplace=True)
+                
+                # Evolve through Clifford if provided
+                if clifford is not None:
+                    error_generators = error_generators.evolve(clifford, frame="s")
+                
+                # Add each generator as a separate entry
+                for gen_idx, generator in enumerate(error_generators):
+                    gen_qargs = np.where(generator.z | generator.x)[0].tolist()
+                    gate_arr = np.concatenate((generator.x, generator.z))
+                    
+                    self.gates.append(gate_arr)
+                    self.qargs.append(gen_qargs)
+                    self.thetas.append(0.0)
+                    self.generators.append(gate_arr)
+                    self.rates.append(float(error.rates[gen_idx]))
+                    self.gate_types.append(1)
+                return
+
+        # Handle Pauli rotation gates
         theta = inst.operation.params[0]
         if not isinstance(inst.operation, PauliEvolutionGate):
             if inst.name not in _ROTATION_TO_GENERATOR:
@@ -212,6 +250,13 @@ class RotationGates(NamedTuple):
         self.gates.append(gate_arr)
         self.qargs.append(qargs)
         self.thetas.append(theta)
+        
+        # If noise fields are initialized, append to them as well
+        if self.generators is not None:
+            assert self.rates is not None and self.gate_types is not None
+            self.generators.append(gate_arr)
+            self.rates.append(0.0)
+            self.gate_types.append(0)
 
 
 def circuit_to_rotation_gates(
