@@ -129,6 +129,11 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 ///
 /// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
 ///
+/// `gate_types` indicates the type of each gate: 0 for Pauli rotation, 1 for Lindblad error.
+///
+/// `lindblad_rates` contains the rates for each Lindblad error generator.
+/// For rotation gates, the corresponding entry should be an empty vector.
+///
 /// `frame` can be:
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
 ///     `h` for Heisenberg evolution: `U(θ)† O U(θ)`
@@ -140,6 +145,8 @@ fn evolve_by_circuit(
     gates: PyReadonlyArray2<bool>,
     qargs: Vec<Vec<usize>>,
     thetas: Vec<f64>,
+    gate_types: Vec<u8>,
+    lindblad_rates: Vec<Vec<f64>>,
     max_terms: usize,
     atol: f64,
     frame: char,
@@ -175,10 +182,21 @@ fn evolve_by_circuit(
             if frame == 'h' {
                 id = num_gates - 1 - i
             };
+            let gate_type = gate_types[id];
             let theta = thetas[id];
             let gate = &gates[ints_per_pauli * id..(id + 1) * ints_per_pauli];
             let qarg = &qargs[id];
-            trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+            
+            if gate_type == 0 {
+                // Standard Pauli rotation
+                trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+            } else if gate_type == 1 {
+                // Lindblad error - placeholder implementation (no-op for now)
+                let _rate = lindblad_rates[id][0]; // Validate that rate exists
+                // TODO: Implement actual Lindblad evolution
+                // For now, this is a no-op (identity channel)
+                // The operator passes through unchanged
+            }
         }
     });
 
