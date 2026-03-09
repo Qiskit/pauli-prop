@@ -296,6 +296,10 @@ def propagate_through_rotation_gates(
 
     For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
+    This function handles both noiseless circuits (Pauli rotations only) and noisy circuits
+    (with Pauli-Lindblad error channels). The presence of noise is automatically detected from
+    the ``rot_gates`` structure.
+
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
     difficulty, one may truncate small Pauli terms (i.e. set them to zero), resulting in a bias proportional to the magnitudes of the
@@ -313,6 +317,7 @@ def propagate_through_rotation_gates(
     Args:
         operator: The operator to propagate
         rot_gates: The circuit represented in the form of :class:`.RotationGates` (see also :func:`.circuit_to_rotation_gates`).
+            May contain Pauli-Lindblad error information.
         max_terms: The maximum number of terms the operator may contain as it is propagated
         atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated. This parameter is not a
             guarantee on the accuracy of the returned operator.
@@ -321,7 +326,7 @@ def propagate_through_rotation_gates(
             ``h`` for Heisenberg evolution
 
     Returns:
-        The evolved operator
+        The evolved operator and truncation norm
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
@@ -378,91 +383,6 @@ def propagate_through_rotation_gates(
 
     return spo_out, trunc_onenorm
 
-def propagate_through_noisy_rotation_gates(
-    operator: SparsePauliOp,
-    rot_gates: RotationGates,
-    max_terms: int,
-    atol: float,
-    frame: str,
-) -> tuple[SparsePauliOp, float]:
-    r"""Propagate a sparse Pauli operator through a circuit with Pauli-Lindblad errors.
-
-    This function handles circuits that contain both Pauli rotation gates and Pauli-Lindblad
-    error channels. The ``rot_gates`` parameter must have been created with
-    :func:`.circuit_to_noisy_rotation_gates` to include the necessary error information.
-
-    For Schrödinger propagation: :math:`U O U^{\dagger}`.
-
-    For Heisenberg propagation: :math:`U^{\dagger} O U`.
-
-    Args:
-        operator: The operator to propagate
-        rot_gates: The circuit with Pauli-Lindblad errors, created by :func:`.circuit_to_noisy_rotation_gates`
-        max_terms: The maximum number of terms the operator may contain as it is propagated
-        atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated
-        frame:
-            ``s`` for Schrödinger evolution
-            ``h`` for Heisenberg evolution
-
-    Returns:
-        The evolved operator and truncation norm
-
-    Raises:
-        ValueError: ``frame`` is neither ``h`` nor ``s``.
-        ValueError: ``atol`` is negative.
-        ValueError: ``max_terms`` is not positive.
-        ValueError: ``rot_gates`` does not contain Pauli-Lindblad error information.
-    """
-    if max_terms < 1:
-        raise ValueError("max_terms must be a positive integer.")
-    if atol < 0.0:
-        raise ValueError("atol must be non-negative.")
-    if len(rot_gates.gates) == 0:
-        return operator.copy(), 0.0
-    if frame not in ["h", "s"]:
-        raise ValueError(f"frame must be 'h' or 's', not {frame}.")
-    if rot_gates.gate_types is None or rot_gates.rates is None:
-        raise ValueError("rot_gates must contain Pauli-Lindblad error information. Use circuit_to_noisy_rotation_gates().")
-
-    operator = operator.simplify(atol=atol)
-    pauli_arr = np.concatenate([operator.paulis.x, operator.paulis.z], axis=1)
-
-    # Lexsort in preparation for rust evolution function
-    sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
-    
-    # Prepare lindblad_rates as list of lists (one rate per gate)
-    lindblad_rates = [[rate] for rate in rot_gates.rates]
-    
-    paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
-        pauli_arr[sorted_ids],
-        operator.coeffs[sorted_ids].astype(np.float64),
-        np.array(rot_gates.gates),
-        rot_gates.qargs,
-        rot_gates.thetas,
-        rot_gates.gate_types,
-        lindblad_rates,
-        max_terms,
-        atol,
-        frame.lower(),
-    )
-    paulis_x = paulis[:, : operator.num_qubits]
-    paulis_z = paulis[:, operator.num_qubits :]
-
-    if len(coeffs) == 0:
-        spo_out = SparsePauliOp(
-            PauliList(["I" * operator.num_qubits]), [0], ignore_pauli_phase=True, copy=False
-        )
-    else:
-        spo_out = SparsePauliOp(
-            PauliList.from_symplectic(paulis_z, paulis_x),
-            coeffs,
-            ignore_pauli_phase=True,
-            copy=False,
-        )
-
-    return spo_out, trunc_onenorm
-
-
 
 def propagate_through_circuit(
     operator: SparsePauliOp,
@@ -510,14 +430,7 @@ def propagate_through_circuit(
         ValueError: ``max_terms`` is not positive.
     """
     rot_gates = circuit_to_rotation_gates(circuit)
-    
-    # Check if circuit contains Pauli-Lindblad errors (rot_gates will have noise fields populated)
-    if rot_gates.gate_types is not None:
-        # Use noisy propagation for circuits with Pauli-Lindblad errors
-        return propagate_through_noisy_rotation_gates(operator, rot_gates, max_terms, atol, frame)
-    else:
-        # Use standard propagation for error-free circuits
-        return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
+    return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
 
 
 def propagate_through_operator(
