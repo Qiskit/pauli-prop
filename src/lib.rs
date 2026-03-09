@@ -238,7 +238,7 @@ fn evolve_by_circuit(
     ))
 }
 
-/// Convert an array of Pauli gate terms (XZ bitstrings in the rows) to bit-packed u64
+/// Convert a 2D array of symplectic Pauli terms (XZ bitstrings in the rows) to bit-packed u64
 fn np_to_cpt2(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> {
     let pauli_array = pauli_array.as_array();
     let (_num_rows, num_cols) = pauli_array.dim();
@@ -263,11 +263,7 @@ fn np_to_cpt2(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64>
     packed_paulis
 }
 
-/// Convert Pauli-Lindblad error generators from Python to Rust format
-///
-/// Takes nested structure: Vec<Vec<PyReadonlyArray1<bool>>> where outer vec is per-error,
-/// inner vec is per-generator, and PyReadonlyArray1 is the boolean Pauli representation.
-/// Returns Vec<Vec<Vec<u64>>> with the same nesting structure but bit-packed.
+/// Convert a 3D array of symplectic Pauli terms (XZ bitstrings in the rows) to bit-packed u64
 fn np_to_cpt3(
     generators: Vec<Vec<PyReadonlyArray1<bool>>>,
     ints_per_pauli: usize,
