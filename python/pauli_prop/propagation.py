@@ -139,10 +139,11 @@ class RotationGates(NamedTuple):
     """An intermediate minimal representation of a :class:`.QuantumCircuit`.
 
     This class describes circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and Pauli-Lindblad
-    error specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindblad    Error>`_ instructions.
+    error specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
-    The Pauli rotations are specified by fields ``gates``, ``qargs``, and ``thetas``. The Pauli-Lindblad error instructions are stored as ``generators`` and
-    ``rates``. ``gate_types`` is a list of ``bool`` values which specifies the type of each input instruction (rotation gate or error channel).
+    The Pauli rotations are specified by fields ``gates``, ``qargs``, and ``thetas``. The Pauli-Lindblad error instructions are specified as ``generators`` and
+    ``rates``. ``gate_types`` is a list of ``bool`` values which specifies the type of each input instruction (rotation gate or error channel) in the order
+    it appears in the circuit.
 
     In a noisy circuit, ordering of instructions is maintained by ``gate_types``. To iterate through each rotation/generator in order, one would generally
     iterate over ``gate_types`` and access the instruction from the appropriate fields, based on its type. In a noiseless circuit, the ordering is trivially
@@ -156,11 +157,11 @@ class RotationGates(NamedTuple):
     thetas: list[float]
     """The rotation angles of all gates."""
     generators: list[list[npt.NDArray[np.bool_]]] | None = None
-    """Pauli-Lindblad error generators (list of generator lists, one per PauliLindbladError instruction)."""
+    """ZX-calculus-like representation of Pauli-Lindblad error generators (list of generator lists, one per PauliLindbladError instruction)."""
     rates: list[list[float]] | None = None
     """Pauli-Lindblad error rates (list of rate lists, one per PauliLindbladError instruction)."""
     gate_types: list[bool] | None = None
-    """Instruction type: False = Pauli rotation (from gates), True = Pauli-Lindblad error (from generators/rates)."""
+    """Instruction types ordered as they appear in the circuit: False = Pauli rotation (from gates), True = Pauli-Lindblad error (from generators/rates)."""
 
     def append_circuit_instruction(
         self,
@@ -223,7 +224,6 @@ class RotationGates(NamedTuple):
                 qargs_list.append(tuple(gen_qargs))
 
             # Append the entire list of generators, rates, and qargs
-            # Type assertions for mypy - these fields are guaranteed to be initialized above
             assert self.generators is not None
             assert self.rates is not None
             assert self.gate_types is not None
@@ -281,7 +281,7 @@ def circuit_to_rotation_gates(
     """Converts the provided circuit to an intermediate representation.
 
     Args:
-        circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`) and optionally
+        circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and optionally
             `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     Returns:

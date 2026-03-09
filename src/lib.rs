@@ -130,13 +130,13 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 /// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
 ///
 /// `gate_types` indicates the type of each instruction: false for Pauli rotation, true for Pauli-Lindblad error.
-/// Empty list means all gates are Pauli rotations (backward compatibility).
+/// Empty array means all gates are Pauli rotations.
 ///
-/// `generators` contains the Pauli generators for Pauli-Lindblad errors (nested: one inner list per PauliLindbladError).
-/// Empty list means no Pauli-Lindblad errors.
+/// `generators` contains the Pauli generators for Pauli-Lindblad errors (nested: one inner array per PauliLindbladError).
+/// Empty array means no Pauli-Lindblad errors.
 ///
-/// `rates` contains the rates for Pauli-Lindblad error generators (nested: one inner list per PauliLindbladError).
-/// Empty list means no Pauli-Lindblad errors.
+/// `rates` contains the rates for Pauli-Lindblad error generators (nested: one inner array per PauliLindbladError).
+/// Empty array means no Pauli-Lindblad errors.
 ///
 /// `frame` can be:
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
@@ -160,36 +160,12 @@ fn evolve_by_circuit(
     let (_, num_cols) = operator.as_array().dim();
     let num_qubits = num_cols / 2;
     let ints_per_pauli = (2 * num_qubits + 63) / 64;
-    let operator = np_to_cpt(operator, max_terms);
-    let gates = np_to_cpt(gates, max_terms);
+    let operator = np_to_cpt2(operator, max_terms);
+    let gates = np_to_cpt2(gates, max_terms);
+    let generators_converted = np_to_cpt3(generators, ints_per_pauli);
     let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
     let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
     let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
-
-    // Convert generators from PyReadonlyArray to Vec<Vec<Vec<u64>>> before detaching
-    // This is necessary because PyReadonlyArray is not Send and cannot cross thread boundaries
-    let generators_converted: Vec<Vec<Vec<u64>>> = generators
-        .iter()
-        .map(|gen_list| {
-            gen_list
-                .iter()
-                .map(|gen_array| {
-                    // Convert each generator array to Vec<u64> format
-                    let gen_2d = gen_array.as_array();
-                    let gen_flat: Vec<bool> = gen_2d.iter().copied().collect();
-
-                    // Pack bools into u64s (same as np_to_cpt but for 1D array)
-                    let mut result = vec![0u64; ints_per_pauli];
-                    for (i, &val) in gen_flat.iter().enumerate() {
-                        if val {
-                            result[i / 64] |= 1u64 << (i % 64);
-                        }
-                    }
-                    result
-                })
-                .collect()
-        })
-        .collect();
 
     // Instantiate the internal operator
     let mut cpt_op = CPTOperatorRust {
@@ -205,9 +181,9 @@ fn evolve_by_circuit(
 
     let mut trunc_onenorm = 0.0;
 
-    // Determine number of instructions based on gate_types or gates
+    // Determine number of instructions
     let num_instructions = if gate_types.is_empty() {
-        thetas.len() // Backward compatibility: all are Pauli rotations
+        thetas.len()
     } else {
         gate_types.len()
     };
@@ -215,7 +191,7 @@ fn evolve_by_circuit(
     // Release the GIL and evolve the operator through the circuit
     py.detach(|| {
         let mut gate_idx = 0;
-        let mut lindblad_idx = 0;
+        let mut pl_error_idx = 0;
 
         for i in 0..num_instructions {
             let mut id = i;
@@ -224,29 +200,26 @@ fn evolve_by_circuit(
             };
 
             // Determine instruction type
-            let is_lindblad = if gate_types.is_empty() {
-                false // Backward compatibility: all rotations
+            let is_pl_error = if gate_types.is_empty() {
+                false
             } else {
                 gate_types[id]
             };
 
-            if !is_lindblad {
+            if !is_pl_error {
                 // Standard Pauli rotation
                 let theta = thetas[gate_idx];
                 let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
-                // For rotations, qargs[id] is a single-element list containing one Vec<usize>
+                // For rotations, qargs[id] is a single-element array containing one Vec<usize>
                 let qarg = &qargs[id][0];
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 gate_idx += 1;
             } else {
-                // Pauli-Lindblad error - placeholder implementation (no-op for now)
-                let _gen_list = &generators_converted[lindblad_idx];
-                let _rate_list = &rates[lindblad_idx];
-                let _qargs_list = &qargs[id]; // List of Vec<usize>, one per generator
-                // TODO: Implement actual Pauli-Lindblad evolution
-                // For now, this is a no-op (identity channel)
-                // The operator passes through unchanged
-                lindblad_idx += 1;
+                // Pauli-Lindblad error placeholder implementation (no-op for now)
+                let _gen_arr = &generators_converted[pl_error_idx];
+                let _rate_arr = &rates[pl_error_idx];
+                let _qargs_arr = &qargs[id];
+                pl_error_idx += 1;
             }
         }
     });
@@ -265,8 +238,8 @@ fn evolve_by_circuit(
     ))
 }
 
-/// Convert an array of Pauli terms (XZ bitstrings in the rows) to bit-packed u64
-fn np_to_cpt(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> {
+/// Convert an array of Pauli gate terms (XZ bitstrings in the rows) to bit-packed u64
+fn np_to_cpt2(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> {
     let pauli_array = pauli_array.as_array();
     let (_num_rows, num_cols) = pauli_array.dim();
     let ints_per_pauli = (num_cols + 63) / 64;
@@ -288,6 +261,39 @@ fn np_to_cpt(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> 
         }
     }
     packed_paulis
+}
+
+/// Convert Pauli-Lindblad error generators from Python to Rust format
+///
+/// Takes nested structure: Vec<Vec<PyReadonlyArray1<bool>>> where outer vec is per-error,
+/// inner vec is per-generator, and PyReadonlyArray1 is the boolean Pauli representation.
+/// Returns Vec<Vec<Vec<u64>>> with the same nesting structure but bit-packed.
+fn np_to_cpt3(
+    generators: Vec<Vec<PyReadonlyArray1<bool>>>,
+    ints_per_pauli: usize,
+) -> Vec<Vec<Vec<u64>>> {
+    generators
+        .iter()
+        .map(|gen_arr| {
+            gen_arr
+                .iter()
+                .map(|gen_array| {
+                    // Convert each generator array to Vec<u64> format
+                    let gen_2d = gen_array.as_array();
+                    let gen_flat: Vec<bool> = gen_2d.iter().copied().collect();
+
+                    // Pack bools into u64s
+                    let mut result = vec![0u64; ints_per_pauli];
+                    for (i, &val) in gen_flat.iter().enumerate() {
+                        if val {
+                            result[i / 64] |= 1u64 << (i % 64);
+                        }
+                    }
+                    result
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// Unpack the ints into their flattened Vec<bool> representation
