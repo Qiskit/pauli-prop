@@ -146,7 +146,7 @@ class RotationGates(NamedTuple):
 
     In a noisy circuit, ordering of instructions is maintained by ``gate_types``. To iterate through each rotation/generator in order, one would generally
     iterate over ``gate_types`` and access the instruction from the appropriate fields, based on its type. In a noiseless circuit, the ordering is trivially
-    preserved by thge ordering of ``gates``, ``qargs``, and ``thetas``.
+    preserved by the ordering of ``gates``, ``qargs``, and ``thetas``.
     """
 
     gates: list[npt.NDArray[np.bool_]]
