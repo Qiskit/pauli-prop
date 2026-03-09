@@ -193,22 +193,24 @@ class RotationGates(NamedTuple):
         if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
             error = inst.operation._quantum_error
             if not isinstance(error, PauliLindbladError):
-                raise ValueError(f"Unknown quantum error type ({error.type}). Expected qiskit_aer.noise.PauliLindbladError.")
+                raise ValueError(
+                    f"Unknown quantum error type ({error.type}). Expected qiskit_aer.noise.PauliLindbladError."
+                )
             # Initialize noise fields if this is the first Pauli-Lindblad error
             if self.generators is None:
-                object.__setattr__(self, 'generators', [])
-                object.__setattr__(self, 'rates', [])
-                object.__setattr__(self, 'gate_types', [False] * len(self.gates))
-            
+                object.__setattr__(self, "generators", [])
+                object.__setattr__(self, "rates", [])
+                object.__setattr__(self, "gate_types", [False] * len(self.gates))
+
             # Expand generators to full circuit width
             id_pauli = Pauli("I" * num_qubits)
             error_generators = PauliList([id_pauli] * len(error.generators))
             error_generators.dot(error.generators, qargs=qargs, inplace=True)
-            
+
             # Evolve through Clifford if provided
             if clifford is not None:
                 error_generators = error_generators.evolve(clifford, frame="s")
-            
+
             # Collect all generators, rates, and qargs for this PauliLindbladError
             gen_list = []
             rate_list = []
@@ -219,8 +221,13 @@ class RotationGates(NamedTuple):
                 gen_list.append(gen_arr)
                 rate_list.append(float(error.rates[gen_idx]))
                 qargs_list.append(tuple(gen_qargs))
-            
+
             # Append the entire list of generators, rates, and qargs
+            # Type assertions for mypy - these fields are guaranteed to be initialized above
+            assert self.generators is not None
+            assert self.rates is not None
+            assert self.gate_types is not None
+
             self.qargs.append(qargs_list)
             self.generators.append(gen_list)
             self.rates.append(rate_list)
@@ -262,7 +269,7 @@ class RotationGates(NamedTuple):
         # This makes qargs always list[list[tuple]] for uniform Rust interface
         self.qargs.append([tuple(qargs)])
         self.thetas.append(theta)
-        
+
         # If noise fields are initialized, mark this as a Pauli rotation
         if self.gate_types is not None:
             self.gate_types.append(False)
@@ -356,12 +363,12 @@ def propagate_through_rotation_gates(
 
     # Lexsort in preparation for rust evolution function
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
-    
+
     # For circuits without Pauli-Lindblad errors, pass empty lists
     gate_types = rot_gates.gate_types if rot_gates.gate_types is not None else []
     generators = rot_gates.generators if rot_gates.generators is not None else []
     rates = rot_gates.rates if rot_gates.rates is not None else []
-    
+
     paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
         pauli_arr[sorted_ids],
         operator.coeffs[sorted_ids].astype(np.float64),
