@@ -263,13 +263,13 @@ def circuit_to_rotation_gates(
     """Converts the provided circuit to an intermediate representation.
 
     Args:
-        circuit: The circuit to convert. May contain Pauli rotations and optionally
+        circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`) and optionally
             `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instances.
 
     Returns:
         The extracted rotation gate data. If the circuit contains Pauli-Lindblad errors,
         the returned RotationGates will include generators, rates, and gate_types fields.
-        Otherwise, these fields will be None for backward compatibility.
+        Otherwise, these fields will be None.
 
     Raises:
         ValueError: when an unsupported gate is encountered in ``circuit``.
