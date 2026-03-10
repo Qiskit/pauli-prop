@@ -388,9 +388,11 @@ def propagate_through_rotation_gates(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit (represented in ``rot_gates``), :math:`U`.
 
-    For Schrödinger propagation: :math:`U O U^{\dagger}`.
+    For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
-    For Heisenberg propagation: :math:`U^{\dagger} O U`.
+    If ``rot_gates`` is a :class:`NoisyRotationGates` instance, the operator will be propagated through each noise generator. The
+    coefficient associated with each term in ``operator``, :math:`c_i`, will be damped according to each anti-commuting error
+    generator's rate, :math:`r_i`: :math:`c_i *= exp(-2.0 * r_i)`.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
@@ -494,9 +496,14 @@ def propagate_through_circuit(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
-    For Schrödinger propagation: :math:`U O U^{\dagger}`.
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
-    For Heisenberg propagation: :math:`U^{\dagger} O U`.
+    For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
+
+    If ``circuit`` contains Pauli-Lindblad noise instructions, the operator will be propagated through each noise generator. The
+    coefficient associated with each term in ``operator``, :math:`c_i`, will be damped according to each anti-commuting error
+    generator's rate, :math:`r_i`: :math:`c_i *= exp(-2.0 * r_i)`.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
