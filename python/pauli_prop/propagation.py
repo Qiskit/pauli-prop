@@ -365,8 +365,9 @@ def circuit_to_rotation_gates(
             noisy_circuit = True
             break
 
+    rot_gates: RotationGates | NoisyRotationGates
     if noisy_circuit:
-        rot_gates: RotationGates | NoisyRotationGates = NoisyRotationGates([], [], [], [], [], [])
+        rot_gates = NoisyRotationGates([], [], [], [], [], [])
     else:
         rot_gates = RotationGates([], [], [])
     for inst in circuit.data:
