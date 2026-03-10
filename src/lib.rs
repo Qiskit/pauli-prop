@@ -129,6 +129,87 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 ///
 /// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
 ///
+/// `frame` can be:
+///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
+///     `h` for Heisenberg evolution: `U(θ)† O U(θ)`
+#[pyfunction]
+fn evolve_by_circuit(
+    py: Python<'_>,
+    operator: PyReadonlyArray2<bool>,
+    coeffs: PyReadonlyArray1<f64>,
+    gates: PyReadonlyArray2<bool>,
+    qargs: Vec<Vec<usize>>,
+    thetas: Vec<f64>,
+    max_terms: usize,
+    atol: f64,
+    frame: char,
+) -> PyResult<(Py<PyArray2<bool>>, Py<PyArray1<f64>>, f64)> {
+    // Prepare the fields for the CPTOperatorRust struct
+    let (_, num_cols) = operator.as_array().dim();
+    let num_qubits = num_cols / 2;
+    let ints_per_pauli = (2 * num_qubits + 63) / 64;
+    let operator = np_to_cpt2(operator, max_terms);
+    let gates = np_to_cpt2(gates, max_terms);
+    let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
+    let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
+    let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
+
+    // Instantiate the internal operator
+    let mut cpt_op = CPTOperatorRust {
+        paulis: operator,
+        coeffs: coeffs,
+        max_terms: max_terms,
+        num_qubits: num_qubits,
+        ints_per_pauli: ints_per_pauli,
+        atol: atol,
+        paulis_buffer: paulis_buffer,
+        coeffs_buffer: coeffs_buffer,
+    };
+
+    let mut trunc_onenorm = 0.0;
+    // Release the GIL and evolve the operator through the circuit
+    let num_gates = thetas.len();
+    py.detach(|| {
+        for i in 0..num_gates {
+            let mut id = i;
+            if frame == 'h' {
+                id = num_gates - 1 - i
+            };
+            let theta = thetas[id];
+            let gate = &gates[ints_per_pauli * id..(id + 1) * ints_per_pauli];
+            let qarg = &qargs[id];
+            trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+        }
+    });
+
+    // Prepare output numpy arrays and return
+    let num_terms = cpt_op.paulis.len() / ints_per_pauli;
+    let unpacked_paulis = unpack_pauli_ints_flat(&cpt_op.paulis, num_terms, num_qubits);
+    let output_paulis =
+        Array2::<bool>::from_shape_vec((num_terms, 2 * num_qubits), unpacked_paulis).unwrap();
+    let output_coeffs = Array1::<f64>::from_vec(cpt_op.coeffs);
+
+    Ok((
+        output_paulis.into_pyarray(py).to_owned().into(),
+        output_coeffs.into_pyarray(py).to_owned().into(),
+        trunc_onenorm,
+    ))
+}
+
+/// Python function for evolving an operator through a noisy circuit.
+///
+/// The operator consists of Pauli terms over `ceil(num_qubits / 64)` integers, and a
+/// real-valued coefficient.
+///
+/// Each gate in the circuit is represented by `ceil(num_qubits / 64)` integers, a rotation
+/// angle, `theta`, and an array of `qargs`.
+///
+/// `max_terms` controls how big the operator can get during evolution. It is the user's
+/// responsibility to ensure they have enough RAM to hold the operator data and the
+/// equivalently sized buffer.
+///
+/// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
+///
 /// `gate_types` indicates the type of each instruction: false for Pauli rotation, true for Pauli-Lindblad error.
 /// Empty array means all gates are Pauli rotations.
 ///
@@ -142,7 +223,7 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
 ///     `h` for Heisenberg evolution: `U(θ)† O U(θ)`
 #[pyfunction]
-fn evolve_by_circuit(
+fn evolve_by_noisy_circuit(
     py: Python<'_>,
     operator: PyReadonlyArray2<bool>,
     coeffs: PyReadonlyArray1<f64>,
@@ -986,6 +1067,7 @@ mod tests {
 #[pymodule]
 fn _accelerate(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(evolve_by_circuit, m)?)?;
+    m.add_function(wrap_pyfunction!(evolve_by_noisy_circuit, m)?)?;
     m.add_function(wrap_pyfunction!(k_largest_products, m)?)?;
     Ok(())
 }
