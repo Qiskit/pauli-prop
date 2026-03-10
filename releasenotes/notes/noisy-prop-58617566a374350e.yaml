@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    The :mod:`pauli_prop.propagation` module now supports propagation of noisy circuits.

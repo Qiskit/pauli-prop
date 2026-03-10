@@ -314,9 +314,6 @@ def propagate_through_rotation_gates(
 
     For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
-    This function handles both noiseless circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`)
-    and noisy circuits containing `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
-
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
     difficulty, one may truncate small Pauli terms (i.e. set them to zero), resulting in a bias proportional to the magnitudes of the

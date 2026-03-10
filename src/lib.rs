@@ -460,7 +460,6 @@ impl CPTOperatorRust {
         let ipp = self.ints_per_pauli;
 
         // Apply damping directly for each generator
-        // This avoids any intermediate data structures
         for (gen_idx, generator) in generators.iter().enumerate() {
             let gen_qargs = &qargs_list[gen_idx];
 
