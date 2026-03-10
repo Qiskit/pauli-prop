@@ -441,7 +441,6 @@ def propagate_through_rotation_gates(
     # Lexsort in preparation for rust evolution function
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
 
-    # For circuits without Pauli-Lindblad errors, pass empty lists
     if isinstance(rot_gates, RotationGates):
         paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
             pauli_arr[sorted_ids],
