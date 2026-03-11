@@ -269,6 +269,10 @@ fn evolve_by_noisy_circuit(
     py.detach(|| {
         let mut gate_idx = 0;
         let mut pl_error_idx = 0;
+        if frame == 'h' {
+            gate_idx = thetas.len() - 1;
+            pl_error_idx = rates.len() - 1;
+        }
 
         for i in 0..num_instructions {
             let mut id = i;
@@ -277,11 +281,7 @@ fn evolve_by_noisy_circuit(
             };
 
             // Determine instruction type
-            let is_pl_error = if gate_types.is_empty() {
-                false
-            } else {
-                gate_types[id]
-            };
+            let is_pl_error = gate_types[id];
 
             if !is_pl_error {
                 // Standard Pauli rotation
@@ -289,7 +289,11 @@ fn evolve_by_noisy_circuit(
                 let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
                 let qarg = &qargs[id][0];
                 trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
-                gate_idx += 1;
+                if frame == 'h' {
+                    gate_idx -= 1;
+                } else {
+                    gate_idx += 1;
+                }
             } else {
                 // Pauli-Lindblad error
                 let gen_list = &generators_converted[pl_error_idx];
@@ -299,6 +303,11 @@ fn evolve_by_noisy_circuit(
                 cpt_op.evolve_by_pauli_lindblad_error(gen_list, rate_list, qargs_list);
 
                 pl_error_idx += 1;
+                if frame == 'h' {
+                    pl_error_idx -= 1;
+                } else {
+                    pl_error_idx += 1;
+                }
             }
         }
     });
