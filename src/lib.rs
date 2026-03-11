@@ -263,11 +263,7 @@ fn evolve_by_noisy_circuit(
     let mut trunc_onenorm = 0.0;
 
     // Determine number of instructions
-    let num_instructions = if gate_types.is_empty() {
-        thetas.len()
-    } else {
-        gate_types.len()
-    };
+    let num_instructions = gate_types.len();
 
     // Release the GIL and evolve the operator through the circuit
     py.detach(|| {

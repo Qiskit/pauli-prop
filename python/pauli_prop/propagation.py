@@ -430,7 +430,9 @@ def propagate_through_rotation_gates(
         raise ValueError("max_terms must be a positive integer.")
     if atol < 0.0:
         raise ValueError("atol must be non-negative.")
-    if len(rot_gates.gates) == 0:
+    if (isinstance(rot_gates, RotationGates) and len(rot_gates.gates) == 0) or (
+        isinstance(rot_gates, NoisyRotationGates) and len(rot_gates.gate_types) == 0
+    ):
         return operator.copy(), 0.0
     if frame not in ["h", "s"]:
         raise ValueError(f"frame must be 'h' or 's', not {frame}.")
@@ -454,10 +456,16 @@ def propagate_through_rotation_gates(
         )
     else:
         assert isinstance(rot_gates, NoisyRotationGates)
+        # Handle empty gates array - need 2D array with correct number of columns
+        if len(rot_gates.gates) == 0:
+            gates_array = np.empty((0, 2 * operator.num_qubits), dtype=np.bool_)
+        else:
+            gates_array = np.array(rot_gates.gates)
+
         paulis, coeffs, trunc_onenorm = evolve_by_noisy_circuit_r(
             pauli_arr[sorted_ids],
             operator.coeffs[sorted_ids].astype(np.float64),
-            np.array(rot_gates.gates),
+            gates_array,
             rot_gates.qargs,
             rot_gates.thetas,
             rot_gates.gate_types,
