@@ -302,7 +302,6 @@ fn evolve_by_noisy_circuit(
 
                 cpt_op.evolve_by_pauli_lindblad_error(gen_list, rate_list, qargs_list);
 
-                pl_error_idx += 1;
                 if frame == 'h' {
                     pl_error_idx -= 1;
                 } else {
