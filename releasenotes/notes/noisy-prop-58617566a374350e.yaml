@@ -2,3 +2,6 @@
 features:
   - |
     The :mod:`pauli_prop.propagation` module now supports propagation of noisy circuits.
+    
+    - :func:`propagate_through_circuit` accepts circuits containing ``PauliLindbladError`` instructions from Qiskit Aer.
+    - :func:`propagate_through_rotation_gates` now accepts either ``RotationGates`` or ``NoisyRotationGates`` instances.
