@@ -27,6 +27,9 @@ from pauli_prop._accelerate import (
     evolve_by_circuit as evolve_by_circuit_r,
 )
 from pauli_prop._accelerate import (
+    evolve_by_noisy_circuit as evolve_by_noisy_circuit_r,
+)
+from pauli_prop._accelerate import (
     k_largest_products as k_largest_products_r,
 )
 
@@ -138,9 +141,7 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
 class RotationGates(NamedTuple):
     """An intermediate minimal representation of a :class:`.QuantumCircuit`.
 
-    During :func:`.propagate_through_circuit` the :class:`.QuantumCircuit` gets converted into a sequence of
-    rotation gates, extracting the parameters and acted-upon qubit indices. These data structures
-    can be passed to the Rust-accelerated internal function in a straight forward manner.
+    Supported Pauli rotations: `rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`
     """
 
     gates: list[npt.NDArray[np.bool_]]
@@ -208,41 +209,190 @@ class RotationGates(NamedTuple):
         self.thetas.append(theta)
 
 
+class NoisyRotationGates(NamedTuple):
+    """An intermediate minimal representation of a :class:`.QuantumCircuit`.
+
+    This class describes circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and Pauli-Lindblad
+    error specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
+
+    The Pauli rotations are specified by fields ``gates``, ``qargs``, and ``thetas``. The Pauli-Lindblad error instructions are specified as ``generators`` and
+    ``rates``. ``gate_types`` is a list of ``bool`` values which specifies the type of each input instruction (rotation gate or error channel) in the order
+    it appears in the circuit.
+
+    In a noisy circuit, ordering of instructions is maintained by ``gate_types``. To iterate through each rotation/generator in order, one would generally
+    iterate over ``gate_types`` and access the instruction from the appropriate fields, based on its type. In a noiseless circuit, the ordering is trivially
+    preserved by the ordering of ``gates``, ``qargs``, and ``thetas``.
+    """
+
+    gates: list[npt.NDArray[np.bool_]]
+    """A ZX-calculus-like representation of the gates."""
+    qargs: list[list[tuple[int, ...]]]
+    """The qubit indices acted upon by each instruction. For rotations: single-element list. For Pauli-Lindblad errors: list of tuples (one per generator)."""
+    thetas: list[float]
+    """The rotation angles of all gates."""
+    generators: list[list[npt.NDArray[np.bool_]]]
+    """ZX-calculus-like representation of Pauli-Lindblad error generators (list of generator lists, one per PauliLindbladError instruction)."""
+    rates: list[list[float]]
+    """Pauli-Lindblad error rates (list of rate lists, one per PauliLindbladError instruction)."""
+    gate_types: list[bool]
+    """Instruction types ordered as they appear in the circuit: False = Pauli rotation (from gates), True = Pauli-Lindblad error (from generators/rates)."""
+
+    def append_circuit_instruction(
+        self,
+        inst: CircuitInstruction,
+        qargs: list[int],
+        num_qubits: int,
+        *,
+        clifford: Clifford | None = None,
+    ) -> None:
+        """Parses a circuit instruction and appends its data to the internal lists.
+
+        Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+        error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
+
+        Args:
+            inst: The circuit instruction to parse and append
+            qargs: The list of qubit indices of the instruction in the context of its circuit
+            num_qubits: The number of qubits of the circuit containing this instruction
+            clifford: An optional Clifford through which the provided instruction should be moved. The instruction will be evolved
+                forward (Schrödinger frame) through the Clifford. The Clifford must act on all qubits in the circuit.
+
+        Raises:
+            ValueError: Unsupported gate encountered in circuit
+            ValueError: If given, ``clifford`` must act on all qubits in circuit
+        """
+        if (clifford is not None) and (clifford.num_qubits != num_qubits):
+            raise ValueError("Clifford must act on all qubits in circuit.")
+
+        # Check if this is a Pauli-Lindblad error
+        if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
+            error = inst.operation._quantum_error
+            if not isinstance(error, PauliLindbladError):
+                raise ValueError(
+                    f"Unknown quantum error type ({error.type}). Expected qiskit_aer.noise.PauliLindbladError."
+                )
+
+            # Expand generators to full circuit width
+            id_pauli = Pauli("I" * num_qubits)
+            error_generators = PauliList([id_pauli] * len(error.generators))
+            error_generators.dot(error.generators, qargs=qargs, inplace=True)
+
+            # Evolve through Clifford if provided
+            if clifford is not None:
+                error_generators = error_generators.evolve(clifford, frame="s")
+
+            # Collect all generators, rates, and qargs for this PauliLindbladError
+            gen_list = []
+            rate_list = []
+            qargs_list = []
+            for gen_idx, generator in enumerate(error_generators):
+                gen_arr = np.concatenate((generator.x, generator.z))
+                gen_qargs = np.where(generator.z | generator.x)[0].tolist()
+                gen_list.append(gen_arr)
+                rate_list.append(float(error.rates[gen_idx]))
+                qargs_list.append(tuple(gen_qargs))
+
+            self.qargs.append(qargs_list)
+            self.generators.append(gen_list)
+            self.rates.append(rate_list)
+            self.gate_types.append(True)
+            return
+
+        # Handle Pauli rotation gates
+        theta = inst.operation.params[0]
+        if not isinstance(inst.operation, PauliEvolutionGate):
+            if inst.name not in _ROTATION_TO_GENERATOR:
+                raise ValueError(f"Encountered unsupported gate: {inst.name}")
+            gate = SparsePauliOp.from_operator(Operator(inst.operation))
+            rotation_pauli = gate.paulis[np.any((gate.paulis.z | gate.paulis.x), axis=1)]
+            # Paulis w 0.0 rotation angles may not contain a Pauli term, so ignore them
+            if len(rotation_pauli) == 0:
+                return
+            assert len(rotation_pauli) == 1
+            rotation_pauli = rotation_pauli[0]
+        else:
+            assert len(inst.operation.operator.paulis) == 1
+            rotation_pauli = inst.operation.operator.paulis[0]
+            theta *= 2.0
+
+        rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
+
+        if clifford is not None:
+            rotation_pauli = rotation_pauli.evolve(clifford, frame="s")
+            if rotation_pauli.phase == 2:
+                theta *= -1
+                rotation_pauli.phase = 0
+
+        assert rotation_pauli.phase == 0
+
+        qargs = np.where(rotation_pauli.z | rotation_pauli.x)[0].tolist()
+        gate_arr = np.concatenate((rotation_pauli.x, rotation_pauli.z))
+
+        self.gates.append(gate_arr)
+        # For consistency with Pauli-Lindblad errors, wrap qargs in a single-element list
+        # This makes qargs always list[list[tuple]] for uniform Rust interface
+        self.qargs.append([tuple(qargs)])
+        self.thetas.append(theta)
+        self.gate_types.append(False)
+
+
 def circuit_to_rotation_gates(
     circuit: QuantumCircuit,
-) -> RotationGates:
+) -> RotationGates | NoisyRotationGates:
     """Converts the provided circuit to an intermediate representation.
 
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
+
     Args:
-        circuit: The circuit to convert. It may contain gates that are Pauli rotations or `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instances.
+        circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and optionally
+            `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     Returns:
-        The extracted rotation gate data.
+        A :class:`.RotationGates` instance if the circuit does not contain ``PauliLindbladError`` instructions; otherwise, a :class:`NoisyRotationGates` instance is returned.
 
     Raises:
         ValueError: when an unsupported gate is encountered in ``circuit``.
     """
-    rot_gates = RotationGates([], [], [])
-    for data in circuit.data:
-        if data.name == "barrier":
+    noisy_circuit = False
+    for inst in circuit.data:
+        if inst.name == "quantum_channel" and hasattr(inst.operation, "_quantum_error"):
+            error = inst.operation._quantum_error
+            if not isinstance(error, PauliLindbladError):
+                raise ValueError(
+                    f"Unknown quantum error type ({error.type}). Expected qiskit_aer.noise.PauliLindbladError."
+                )
+            noisy_circuit = True
+            break
+
+    rot_gates: RotationGates | NoisyRotationGates
+    if noisy_circuit:
+        rot_gates = NoisyRotationGates([], [], [], [], [], [])
+    else:
+        rot_gates = RotationGates([], [], [])
+    for inst in circuit.data:
+        if inst.name == "barrier":
             continue
-        qargs = [circuit.find_bit(qubit).index for qubit in data.qubits]
-        rot_gates.append_circuit_instruction(data, qargs, circuit.num_qubits)
+        qargs = [circuit.find_bit(qubit).index for qubit in inst.qubits]
+        rot_gates.append_circuit_instruction(inst, qargs, circuit.num_qubits)
+
     return rot_gates
 
 
 def propagate_through_rotation_gates(
     operator: SparsePauliOp,
-    rot_gates: RotationGates,
+    rot_gates: RotationGates | NoisyRotationGates,
     max_terms: int,
     atol: float,
     frame: str,
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit (represented in ``rot_gates``), :math:`U`.
 
-    For Schrödinger propagation: :math:`U O U^{\dagger}`.
+    For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
 
-    For Heisenberg propagation: :math:`U^{\dagger} O U`.
+    If ``rot_gates`` is a :class:`NoisyRotationGates` instance, the operator will be propagated through each noise generator. The
+    coefficient associated with each term in ``operator``, :math:`c_i`, will be damped according to each anti-commuting error
+    generator's rate, :math:`r_i`: :math:`c_i *= exp(-2.0 * r_i)`.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential
@@ -260,7 +410,7 @@ def propagate_through_rotation_gates(
 
     Args:
         operator: The operator to propagate
-        rot_gates: The circuit represented in the form of :class:`.RotationGates` (see also :func:`.circuit_to_rotation_gates`).
+        rot_gates: A circuit represented in the form of :class:`.RotationGates`.
         max_terms: The maximum number of terms the operator may contain as it is propagated
         atol: Terms with coeff magnitudes less than this will not be added to the operator as it is propagated. This parameter is not a
             guarantee on the accuracy of the returned operator.
@@ -269,7 +419,7 @@ def propagate_through_rotation_gates(
             ``h`` for Heisenberg evolution
 
     Returns:
-        The evolved operator
+        The evolved operator and one-norm of all truncated coefficients.
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
@@ -280,7 +430,9 @@ def propagate_through_rotation_gates(
         raise ValueError("max_terms must be a positive integer.")
     if atol < 0.0:
         raise ValueError("atol must be non-negative.")
-    if len(rot_gates.gates) == 0:
+    if (isinstance(rot_gates, RotationGates) and len(rot_gates.gates) == 0) or (
+        isinstance(rot_gates, NoisyRotationGates) and len(rot_gates.gate_types) == 0
+    ):
         return operator.copy(), 0.0
     if frame not in ["h", "s"]:
         raise ValueError(f"frame must be 'h' or 's', not {frame}.")
@@ -290,16 +442,40 @@ def propagate_through_rotation_gates(
 
     # Lexsort in preparation for rust evolution function
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
-    paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
-        pauli_arr[sorted_ids],
-        operator.coeffs[sorted_ids].astype(np.float64),
-        np.array(rot_gates.gates),
-        rot_gates.qargs,
-        rot_gates.thetas,
-        max_terms,
-        atol,
-        frame.lower(),
-    )
+
+    if isinstance(rot_gates, RotationGates):
+        paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
+            pauli_arr[sorted_ids],
+            operator.coeffs[sorted_ids].astype(np.float64),
+            np.array(rot_gates.gates),
+            rot_gates.qargs,
+            rot_gates.thetas,
+            max_terms,
+            atol,
+            frame.lower(),
+        )
+    else:
+        assert isinstance(rot_gates, NoisyRotationGates)
+        # Handle empty gates array - need 2D array with correct number of columns
+        if len(rot_gates.gates) == 0:
+            gates_array = np.empty((0, 2 * operator.num_qubits), dtype=np.bool_)
+        else:
+            gates_array = np.array(rot_gates.gates)
+
+        paulis, coeffs, trunc_onenorm = evolve_by_noisy_circuit_r(
+            pauli_arr[sorted_ids],
+            operator.coeffs[sorted_ids].astype(np.float64),
+            gates_array,
+            rot_gates.qargs,
+            rot_gates.thetas,
+            rot_gates.gate_types,
+            rot_gates.generators,
+            rot_gates.rates,
+            max_terms,
+            atol,
+            frame.lower(),
+        )
+
     paulis_x = paulis[:, : operator.num_qubits]
     paulis_z = paulis[:, operator.num_qubits :]
 
@@ -327,9 +503,14 @@ def propagate_through_circuit(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
-    For Schrödinger propagation: :math:`U O U^{\dagger}`.
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
-    For Heisenberg propagation: :math:`U^{\dagger} O U`.
+    For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
+
+    If ``circuit`` contains Pauli-Lindblad noise instructions, the operator will be propagated through each noise generator. The
+    coefficient associated with each term in ``operator``, :math:`c_i`, will be damped according to each anti-commuting error
+    generator's rate, :math:`r_i`: :math:`c_i *= exp(-2.0 * r_i)`.
 
     In general, the memory and time required for propagating through a circuit grows exponentially with the number of operations in the
     circuit due to the exponential growth in the number of terms of the operator in the Pauli basis. To regulate this exponential

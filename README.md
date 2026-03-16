@@ -18,12 +18,13 @@ subroutines in this package may be used to implement:
 ##### Technical details
 
 - Rust-accelerated Python interface
-- Current implementation is single-threaded
+- Support for noisy simulations [[tutorial 3](https://qiskit.github.io/pauli-prop/tutorials/03_simulate_noisy_expectation_values.html)]
 - Ability to truncate operator terms during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
 - Novel technique for approximating the conjugation of two Pauli-sum operators. This heuristic
 implementation greedily generates contributions to the product expected to be most significant.
+- Current implementation is single-threaded
 
 ##### Computational requirements
 

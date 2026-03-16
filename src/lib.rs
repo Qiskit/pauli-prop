@@ -7,10 +7,10 @@ use num_complex::{Complex, ComplexFloat};
 use numpy::ndarray::{Array1, Array2};
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use ordered_float::OrderedFloat;
+use pyo3::Bound;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
-use pyo3::Bound;
 use rustc_hash::FxHasher;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -148,8 +148,8 @@ fn evolve_by_circuit(
     let (_, num_cols) = operator.as_array().dim();
     let num_qubits = num_cols / 2;
     let ints_per_pauli = (2 * num_qubits + 63) / 64;
-    let operator = np_to_cpt(operator, max_terms);
-    let gates = np_to_cpt(gates, max_terms);
+    let operator = np_to_cpt2(operator, max_terms);
+    let gates = np_to_cpt2(gates, max_terms);
     let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
     let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
     let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
@@ -196,8 +196,137 @@ fn evolve_by_circuit(
     ))
 }
 
-/// Convert an array of Pauli terms (XZ bitstrings in the rows) to bit-packed u64
-fn np_to_cpt(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> {
+/// Python function for evolving an operator through a noisy circuit.
+///
+/// The operator consists of Pauli terms over `ceil(num_qubits / 64)` integers, and a
+/// real-valued coefficient.
+///
+/// Each gate in the circuit is represented by `ceil(num_qubits / 64)` integers, a rotation
+/// angle, `theta`, and an array of `qargs`.
+///
+/// `max_terms` controls how big the operator can get during evolution. It is the user's
+/// responsibility to ensure they have enough RAM to hold the operator data and the
+/// equivalently sized buffer.
+///
+/// `atol` controls the magnitude a new term's coefficient must be to remain in the operator.
+///
+/// `gate_types` indicates the type of each instruction: false for Pauli rotation, true for Pauli-Lindblad error.
+/// Empty array means all gates are Pauli rotations.
+///
+/// `generators` contains the Pauli generators for Pauli-Lindblad errors (nested: one inner array per PauliLindbladError).
+/// Empty array means no Pauli-Lindblad errors.
+///
+/// `rates` contains the rates for Pauli-Lindblad error generators (nested: one inner array per PauliLindbladError).
+/// Empty array means no Pauli-Lindblad errors.
+///
+/// `frame` can be:
+///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
+///     `h` for Heisenberg evolution: `U(θ)† O U(θ)`
+#[pyfunction]
+fn evolve_by_noisy_circuit(
+    py: Python<'_>,
+    operator: PyReadonlyArray2<bool>,
+    coeffs: PyReadonlyArray1<f64>,
+    gates: PyReadonlyArray2<bool>,
+    qargs: Vec<Vec<Vec<usize>>>,
+    thetas: Vec<f64>,
+    gate_types: Vec<bool>,
+    generators: Vec<Vec<PyReadonlyArray1<bool>>>,
+    rates: Vec<Vec<f64>>,
+    max_terms: usize,
+    atol: f64,
+    frame: char,
+) -> PyResult<(Py<PyArray2<bool>>, Py<PyArray1<f64>>, f64)> {
+    // Prepare the fields for the CPTOperatorRust struct
+    let (_, num_cols) = operator.as_array().dim();
+    let num_qubits = num_cols / 2;
+    let ints_per_pauli = (2 * num_qubits + 63) / 64;
+    let operator = np_to_cpt2(operator, max_terms);
+    let gates = np_to_cpt2(gates, max_terms);
+    let generators_converted = np_to_cpt3(generators, ints_per_pauli);
+    let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
+    let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
+    let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
+
+    // Instantiate the internal operator
+    let mut cpt_op = CPTOperatorRust {
+        paulis: operator,
+        coeffs: coeffs,
+        max_terms: max_terms,
+        num_qubits: num_qubits,
+        ints_per_pauli: ints_per_pauli,
+        atol: atol,
+        paulis_buffer: paulis_buffer,
+        coeffs_buffer: coeffs_buffer,
+    };
+
+    let mut trunc_onenorm = 0.0;
+
+    // Determine number of instructions
+    let num_instructions = gate_types.len();
+
+    // Release the GIL and evolve the operator through the circuit
+    py.detach(|| {
+        let mut gate_idx = 0;
+        let mut pl_error_idx = 0;
+        if frame == 'h' {
+            gate_idx = thetas.len() - 1;
+            pl_error_idx = rates.len() - 1;
+        }
+
+        for i in 0..num_instructions {
+            let mut id = i;
+            if frame == 'h' {
+                id = num_instructions - 1 - i
+            };
+
+            // Determine instruction type
+            let is_pl_error = gate_types[id];
+
+            if !is_pl_error {
+                // Standard Pauli rotation
+                let theta = thetas[gate_idx];
+                let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
+                let qarg = &qargs[id][0];
+                trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+                if frame == 'h' {
+                    gate_idx -= 1;
+                } else {
+                    gate_idx += 1;
+                }
+            } else {
+                // Pauli-Lindblad error
+                let gen_list = &generators_converted[pl_error_idx];
+                let rate_list = &rates[pl_error_idx];
+                let qargs_list = &qargs[id];
+
+                cpt_op.evolve_by_pauli_lindblad_error(gen_list, rate_list, qargs_list);
+
+                if frame == 'h' {
+                    pl_error_idx -= 1;
+                } else {
+                    pl_error_idx += 1;
+                }
+            }
+        }
+    });
+
+    // Prepare output numpy arrays and return
+    let num_terms = cpt_op.paulis.len() / ints_per_pauli;
+    let unpacked_paulis = unpack_pauli_ints_flat(&cpt_op.paulis, num_terms, num_qubits);
+    let output_paulis =
+        Array2::<bool>::from_shape_vec((num_terms, 2 * num_qubits), unpacked_paulis).unwrap();
+    let output_coeffs = Array1::<f64>::from_vec(cpt_op.coeffs);
+
+    Ok((
+        output_paulis.into_pyarray(py).to_owned().into(),
+        output_coeffs.into_pyarray(py).to_owned().into(),
+        trunc_onenorm,
+    ))
+}
+
+/// Convert a 2D array of symplectic Pauli terms (XZ bitstrings in the rows) to bit-packed u64
+fn np_to_cpt2(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> {
     let pauli_array = pauli_array.as_array();
     let (_num_rows, num_cols) = pauli_array.dim();
     let ints_per_pauli = (num_cols + 63) / 64;
@@ -219,6 +348,35 @@ fn np_to_cpt(pauli_array: PyReadonlyArray2<bool>, max_terms: usize) -> Vec<u64> 
         }
     }
     packed_paulis
+}
+
+/// Convert a 3D array of symplectic Pauli terms (XZ bitstrings in the rows) to bit-packed u64
+fn np_to_cpt3(
+    generators: Vec<Vec<PyReadonlyArray1<bool>>>,
+    ints_per_pauli: usize,
+) -> Vec<Vec<Vec<u64>>> {
+    generators
+        .iter()
+        .map(|gen_arr| {
+            gen_arr
+                .iter()
+                .map(|gen_array| {
+                    // Convert each generator array to Vec<u64> format
+                    let gen_2d = gen_array.as_array();
+                    let gen_flat: Vec<bool> = gen_2d.iter().copied().collect();
+
+                    // Pack bools into u64s
+                    let mut result = vec![0u64; ints_per_pauli];
+                    for (i, &val) in gen_flat.iter().enumerate() {
+                        if val {
+                            result[i / 64] |= 1u64 << (i % 64);
+                        }
+                    }
+                    result
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// Unpack the ints into their flattened Vec<bool> representation
@@ -374,6 +532,34 @@ impl CPTOperatorRust {
         trunc_onenorm
     }
 
+    /// Evolve the operator through a Pauli-Lindblad error channel.
+    ///
+    /// For each generator in the error channel, terms that anticommute with the generator
+    /// are damped by a factor of exp(-2 * rate).
+    fn evolve_by_pauli_lindblad_error(
+        &mut self,
+        generators: &[Vec<u64>],
+        rates: &[f64],
+        qargs_list: &[Vec<usize>],
+    ) {
+        let ipp = self.ints_per_pauli;
+
+        // Apply damping directly for each generator
+        for (gen_idx, generator) in generators.iter().enumerate() {
+            let gen_qargs = &qargs_list[gen_idx];
+
+            // Get indices of operator terms that anticommute with this generator
+            let anticomm_ids =
+                get_anticommuting(&self.paulis, generator, gen_qargs, self.num_qubits, ipp);
+
+            // Apply damping factor exp(-2 * rate) to each anticommuting term
+            let damping = (-2.0 * rates[gen_idx]).exp();
+            for &term_idx in &anticomm_ids {
+                self.coeffs[term_idx] *= damping;
+            }
+        }
+    }
+
     /// Insert new terms into the operator.
     ///
     /// If a term already exists, the coeffs are summed. The lexicographical ordering
@@ -489,11 +675,7 @@ fn get_anticommuting(
                     anticomm_flag = !anticomm_flag;
                 }
             }
-            if anticomm_flag {
-                Some(pauli_id)
-            } else {
-                None
-            }
+            if anticomm_flag { Some(pauli_id) } else { None }
         })
         .collect()
 }
@@ -889,6 +1071,7 @@ mod tests {
 #[pymodule]
 fn _accelerate(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(evolve_by_circuit, m)?)?;
+    m.add_function(wrap_pyfunction!(evolve_by_noisy_circuit, m)?)?;
     m.add_function(wrap_pyfunction!(k_largest_products, m)?)?;
     Ok(())
 }

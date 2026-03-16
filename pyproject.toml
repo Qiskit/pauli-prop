@@ -44,6 +44,7 @@ dev = [
 basetest = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "qiskit-addon-utils",
 ]
 test = [
     "pauli-prop[basetest]",
@@ -67,7 +68,7 @@ notebook-dependencies = [
     "pauli-prop",
     "matplotlib",
     "qiskit-ibm-runtime",
-    "rustworkx",
+    "rustworkx[graphviz]>=0.15",
     "ipywidgets",
     "pylatexenc",
 ]
