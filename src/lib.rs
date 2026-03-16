@@ -455,8 +455,6 @@ impl CPTOperatorRust {
                 self.paulis_buffer
                     .extend_from_slice(&self.paulis[i * ipp..(i + 1) * ipp]);
                 self.coeffs_buffer.push(self.coeffs[i]);
-            } else {
-                trunc_onenorm += c.abs();
             }
         }
 
