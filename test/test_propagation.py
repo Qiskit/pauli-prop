@@ -223,3 +223,46 @@ class TestPropagation(unittest.TestCase):
         truncated_dict = _pauli_dict(truncated)
         expected_dict = _pauli_dict(expected)
         self.assertEqual(truncated_dict, expected_dict)
+
+    def test_truncation_norm_l1_vs_l2_circuit(self):
+        """L1 and L2 truncation metrics differ; evolved operator must not depend on the metric."""
+
+        circuit = QuantumCircuit(2)
+        circuit.rzz(math.pi / 4, 0, 1)
+        operator = SparsePauliOp.from_list([("ZI", 0.9), ("IZ", 0.1), ("ZZ", 0.05)])
+
+        kwargs = {"max_terms": 1, "atol": 1e-12, "frame": "s"}
+        ev_l1, m_l1 = propagate_through_circuit(
+            operator, circuit, **kwargs, truncation_norm="l1"
+        )
+        ev_l2, m_l2 = propagate_through_circuit(
+            operator, circuit, **kwargs, truncation_norm="l2"
+        )
+
+        d1 = _pauli_dict(ev_l1)
+        d2 = _pauli_dict(ev_l2)
+        self.assertSetEqual(set(d1.keys()), set(d2.keys()))
+        evolved_coeffs = np.array([d1[k] for k in sorted(d1)])
+        assert_allclose(evolved_coeffs, np.array([d2[k] for k in sorted(d2)]))
+
+        # max_terms=1 discards the two smallest-magnitude terms (|0.05| and |0.1|) in one step.
+        assert_allclose(m_l1, 0.15, rtol=0.0, atol=1e-10)
+        assert_allclose(m_l2, math.sqrt(0.05**2 + 0.1**2), rtol=0.0, atol=1e-10)
+        self.assertGreater(m_l1, m_l2)
+
+    def test_truncation_norm_invalid(self):
+        """truncation_norm must be 'l1' or 'l2' (case-insensitive)."""
+
+        circuit = QuantumCircuit(1)
+        circuit.ry(math.pi / 5, 0)
+        operator = SparsePauliOp.from_list([("Z", 1.0)])
+
+        with self.assertRaises(ValueError):
+            propagate_through_circuit(
+                operator,
+                circuit,
+                max_terms=4,
+                atol=1e-12,
+                frame="s",
+                truncation_norm="frobenius",
+            )

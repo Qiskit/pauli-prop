@@ -22,6 +22,7 @@ subroutines in this package may be used to implement:
 - Ability to truncate operator terms during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
+- Circuit propagation routines can summarize discarded coefficients with either an $\ell_1$-style sum of absolute magnitudes or an $\ell_2$-style aggregate via ``truncation_norm`` on ``propagate_through_circuit`` / ``propagate_through_rotation_gates``.
 - Novel technique for approximating the conjugation of two Pauli-sum operators. This heuristic
 implementation greedily generates contributions to the product expected to be most significant.
 - Current implementation is single-threaded
@@ -35,7 +36,8 @@ the evolved operator is allowed to grow.
 the action of a sequence of $N$ Pauli rotation gates of an $M$-qubit circuit, the number of terms
 will grow as $\mathcal{O}(2^{N})$ towards a maximum of $4^M$ unique Pauli components. To control
 the memory usage, the operator is truncated after application of each gate, which introduces some
-error proportional to the magnitudes of the truncated terms' coefficients. The memory requirements
+error proportional to the magnitudes of the truncated terms' coefficients. By default these
+calls also return an $\ell_1$-style sum of discarded coefficient magnitudes; use ``truncation_norm="l2"`` for a Euclidean aggregation of those magnitudes. The memory requirements
 are generally linear in the size of the evolved operator and runtime scales linearly in both the
 operator size and the number of gates.
 

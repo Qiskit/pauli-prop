@@ -21,6 +21,46 @@ type Entry = (OrderedFloat<f64>, usize, usize, usize);
 
 const PHASE_MOD: u8 = 4;
 
+/// How to aggregate magnitudes of truncated or dropped Pauli coefficients into the scalar
+/// returned from circuit evolution.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TruncationNorm {
+    /// Sum of absolute values of discarded coefficients (existing behavior).
+    L1,
+    /// Euclidean aggregate: `sqrt(sum of squares of discarded coefficients)` over the circuit.
+    L2,
+}
+
+impl TruncationNorm {
+    #[inline(always)]
+    fn accumulate(self, acc: f64, coeff: f64) -> f64 {
+        match self {
+            TruncationNorm::L1 => acc + coeff.abs(),
+            TruncationNorm::L2 => acc + coeff * coeff,
+        }
+    }
+
+    /// Turn the running accumulator into the value returned to Python.
+    fn finalize(self, acc: f64) -> f64 {
+        match self {
+            TruncationNorm::L1 => acc,
+            TruncationNorm::L2 => acc.max(0.0).sqrt(),
+        }
+    }
+}
+
+fn parse_truncation_norm(s: &str) -> PyResult<TruncationNorm> {
+    if s.eq_ignore_ascii_case("l1") {
+        Ok(TruncationNorm::L1)
+    } else if s.eq_ignore_ascii_case("l2") {
+        Ok(TruncationNorm::L2)
+    } else {
+        Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "truncation_norm must be 'l1' or 'l2', got {s:?}"
+        )))
+    }
+}
+
 /// Find the `k` largest index triplets ,`(l, m, n)`, such that
 /// `abs(other[l] @ to_evolve[m] @ other[n])` is maximized.
 /// If `assume_hermitian` is True, caller must replace off-diagonal terms `l != n`
@@ -132,7 +172,21 @@ fn make_key(i: usize, j: usize, k: usize) -> [u64; 2] {
 /// `frame` can be:
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
 ///     `h` for Heisenberg evolution: `U(θ)† O U(θ)`
+///
+/// `truncation_norm`: `"l1"` (default) sums absolute discarded coefficients; `"l2"` returns the
+/// square root of the sum of squares of those coefficients over the whole evolution.
 #[pyfunction]
+#[pyo3(signature = (
+    operator,
+    coeffs,
+    gates,
+    qargs,
+    thetas,
+    max_terms,
+    atol,
+    frame,
+    truncation_norm = "l1",
+))]
 fn evolve_by_circuit(
     py: Python<'_>,
     operator: PyReadonlyArray2<bool>,
@@ -143,6 +197,7 @@ fn evolve_by_circuit(
     max_terms: usize,
     atol: f64,
     frame: char,
+    truncation_norm: &str,
 ) -> PyResult<(Py<PyArray2<bool>>, Py<PyArray1<f64>>, f64)> {
     // Prepare the fields for the CPTOperatorRust struct
     let (_, num_cols) = operator.as_array().dim();
@@ -153,6 +208,7 @@ fn evolve_by_circuit(
     let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
     let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
     let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
+    let trunc_norm = parse_truncation_norm(truncation_norm)?;
 
     // Instantiate the internal operator
     let mut cpt_op = CPTOperatorRust {
@@ -162,11 +218,12 @@ fn evolve_by_circuit(
         num_qubits: num_qubits,
         ints_per_pauli: ints_per_pauli,
         atol: atol,
+        trunc_norm,
         paulis_buffer: paulis_buffer,
         coeffs_buffer: coeffs_buffer,
     };
 
-    let mut trunc_onenorm = 0.0;
+    let mut trunc_acc = 0.0;
     // Release the GIL and evolve the operator through the circuit
     let num_gates = thetas.len();
     py.detach(|| {
@@ -178,9 +235,10 @@ fn evolve_by_circuit(
             let theta = thetas[id];
             let gate = &gates[ints_per_pauli * id..(id + 1) * ints_per_pauli];
             let qarg = &qargs[id];
-            trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+            trunc_acc += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
         }
     });
+    let trunc_metric = cpt_op.trunc_norm.finalize(trunc_acc);
 
     // Prepare output numpy arrays and return
     let num_terms = cpt_op.paulis.len() / ints_per_pauli;
@@ -192,7 +250,7 @@ fn evolve_by_circuit(
     Ok((
         output_paulis.into_pyarray(py).to_owned().into(),
         output_coeffs.into_pyarray(py).to_owned().into(),
-        trunc_onenorm,
+        trunc_metric,
     ))
 }
 
@@ -222,7 +280,23 @@ fn evolve_by_circuit(
 /// `frame` can be:
 ///     `s` for Schrodinger evolution: `U(θ) O U(θ)†`
 ///     `h` for Heisenberg evolution: `U(θ)† O U(θ)`
+///
+/// See [`evolve_by_circuit`] for `truncation_norm`.
 #[pyfunction]
+#[pyo3(signature = (
+    operator,
+    coeffs,
+    gates,
+    qargs,
+    thetas,
+    gate_types,
+    generators,
+    rates,
+    max_terms,
+    atol,
+    frame,
+    truncation_norm = "l1",
+))]
 fn evolve_by_noisy_circuit(
     py: Python<'_>,
     operator: PyReadonlyArray2<bool>,
@@ -236,6 +310,7 @@ fn evolve_by_noisy_circuit(
     max_terms: usize,
     atol: f64,
     frame: char,
+    truncation_norm: &str,
 ) -> PyResult<(Py<PyArray2<bool>>, Py<PyArray1<f64>>, f64)> {
     // Prepare the fields for the CPTOperatorRust struct
     let (_, num_cols) = operator.as_array().dim();
@@ -247,6 +322,7 @@ fn evolve_by_noisy_circuit(
     let coeffs: Vec<f64> = coeffs.as_array().to_owned().into_iter().collect();
     let paulis_buffer: Vec<u64> = Vec::with_capacity(ints_per_pauli * max_terms);
     let coeffs_buffer: Vec<f64> = Vec::with_capacity(max_terms);
+    let trunc_norm = parse_truncation_norm(truncation_norm)?;
 
     // Instantiate the internal operator
     let mut cpt_op = CPTOperatorRust {
@@ -256,11 +332,12 @@ fn evolve_by_noisy_circuit(
         num_qubits: num_qubits,
         ints_per_pauli: ints_per_pauli,
         atol: atol,
+        trunc_norm,
         paulis_buffer: paulis_buffer,
         coeffs_buffer: coeffs_buffer,
     };
 
-    let mut trunc_onenorm = 0.0;
+    let mut trunc_acc = 0.0;
 
     // Determine number of instructions
     let num_instructions = gate_types.len();
@@ -288,7 +365,7 @@ fn evolve_by_noisy_circuit(
                 let theta = thetas[gate_idx];
                 let gate = &gates[ints_per_pauli * gate_idx..(gate_idx + 1) * ints_per_pauli];
                 let qarg = &qargs[id][0];
-                trunc_onenorm += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
+                trunc_acc += cpt_op.evolve_by_pauli_rotation(gate, theta, qarg, frame);
                 if frame == 'h' {
                     gate_idx -= 1;
                 } else {
@@ -310,6 +387,7 @@ fn evolve_by_noisy_circuit(
             }
         }
     });
+    let trunc_metric = cpt_op.trunc_norm.finalize(trunc_acc);
 
     // Prepare output numpy arrays and return
     let num_terms = cpt_op.paulis.len() / ints_per_pauli;
@@ -321,7 +399,7 @@ fn evolve_by_noisy_circuit(
     Ok((
         output_paulis.into_pyarray(py).to_owned().into(),
         output_coeffs.into_pyarray(py).to_owned().into(),
-        trunc_onenorm,
+        trunc_metric,
     ))
 }
 
@@ -413,6 +491,7 @@ pub struct CPTOperatorRust {
     num_qubits: usize,
     ints_per_pauli: usize,
     atol: f64,
+    trunc_norm: TruncationNorm,
     paulis_buffer: Vec<u64>,
     coeffs_buffer: Vec<f64>,
 }
@@ -445,8 +524,10 @@ impl CPTOperatorRust {
         // We sort the new indices, so they remain sorted in new array.
         indices[..k].sort_unstable();
 
-        // Compute the L1-norm of the truncated coefficients as we wish to return this later.
-        let mut trunc_onenorm = indices[k..].iter().map(|&i| self.coeffs[i].abs()).sum();
+        // Accumulate discarded-coefficient metric (L1: sum of |c|; L2: sum of c^2) for this step.
+        let mut trunc_acc = indices[k..]
+            .iter()
+            .fold(0.0, |acc, &i| self.trunc_norm.accumulate(acc, self.coeffs[i]));
 
         let ipp = self.ints_per_pauli;
         for &i in &indices[..k] {
@@ -456,7 +537,7 @@ impl CPTOperatorRust {
                     .extend_from_slice(&self.paulis[i * ipp..(i + 1) * ipp]);
                 self.coeffs_buffer.push(self.coeffs[i]);
             } else {
-                trunc_onenorm += c.abs();
+                trunc_acc = self.trunc_norm.accumulate(trunc_acc, c);
             }
         }
 
@@ -464,7 +545,7 @@ impl CPTOperatorRust {
         std::mem::swap(&mut self.paulis, &mut self.paulis_buffer);
         std::mem::swap(&mut self.coeffs, &mut self.coeffs_buffer);
 
-        trunc_onenorm
+        trunc_acc
     }
 
     /// Evolve self (`O`) through a Pauli rotation, `U(θ)`.
@@ -489,7 +570,7 @@ impl CPTOperatorRust {
             theta *= -1.0;
         }
 
-        let mut trunc_onenorm = 0.0;
+        let mut trunc_acc = 0.0;
 
         // Get all the new terms to apply to the operator
         let mut new_terms: Vec<(Vec<u64>, f64)> = anticomm_ids
@@ -510,7 +591,7 @@ impl CPTOperatorRust {
                     }
                     return Some((new_pauli, new_coeff));
                 } else {
-                    trunc_onenorm += new_coeff.abs();
+                    trunc_acc = self.trunc_norm.accumulate(trunc_acc, new_coeff);
                     return None;
                 }
             })
@@ -524,12 +605,12 @@ impl CPTOperatorRust {
         // Apply the new terms to the operator. This method inherently de-duplicates.
         // The operator can outgrow `max_terms` here before being truncated in the
         // next step.
-        trunc_onenorm += self.insert_or_combine(&mut new_terms);
+        trunc_acc += self.insert_or_combine(&mut new_terms);
 
         // Drop small terms and ensure the operator has fewer than max_terms terms
-        trunc_onenorm += self.truncate();
+        trunc_acc += self.truncate();
 
-        trunc_onenorm
+        trunc_acc
     }
 
     /// Evolve the operator through a Pauli-Lindblad error channel.
@@ -566,7 +647,7 @@ impl CPTOperatorRust {
     /// of the Pauli terms will be maintained as terms are added. Terms with coeffs below
     /// `self.atol` will not be added.
     ///
-    /// Returns the sum of coefficients that are dropped because their magnitude is below `atol`.
+    /// Returns the accumulated truncation metric for drops in this call (L1: sum of |c|; L2: sum of c²).
     fn insert_or_combine(&mut self, new_terms: &mut [(Vec<u64>, f64)]) -> f64 {
         // Sort the new terms so we can stream them into the new operator
         let ipp = self.ints_per_pauli;
@@ -581,7 +662,7 @@ impl CPTOperatorRust {
         self.coeffs_buffer
             .reserve(self.coeffs.len() + new_terms.len());
 
-        let mut trunc_onenorm = 0.0;
+        let mut trunc_acc = 0.0;
 
         // Stream the current operator (sorted), along w the sorted new terms into a new array
         let mut i = 0;
@@ -606,7 +687,7 @@ impl CPTOperatorRust {
                         self.paulis_buffer.extend_from_slice(existing);
                         self.coeffs_buffer.push(new_coeff);
                     } else {
-                        trunc_onenorm += new_coeff.abs();
+                        trunc_acc = self.trunc_norm.accumulate(trunc_acc, new_coeff);
                     }
                     i += 1;
                     j += 1;
@@ -631,7 +712,7 @@ impl CPTOperatorRust {
         std::mem::swap(&mut self.paulis, &mut self.paulis_buffer);
         std::mem::swap(&mut self.coeffs, &mut self.coeffs_buffer);
 
-        trunc_onenorm
+        trunc_acc
     }
 }
 
@@ -752,6 +833,7 @@ mod tests {
             num_qubits: 2,
             ints_per_pauli: 1,
             atol: 1e-12,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
@@ -817,6 +899,7 @@ mod tests {
             num_qubits,
             ints_per_pauli,
             atol: 1e-12,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: Vec::with_capacity(ints_per_pauli * max_terms),
             coeffs_buffer: Vec::with_capacity(max_terms),
         };
@@ -840,6 +923,7 @@ mod tests {
             num_qubits: 2,
             ints_per_pauli: 1,
             atol: 1e-12,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
@@ -874,6 +958,7 @@ mod tests {
             num_qubits: 38,
             ints_per_pauli: 2,
             atol: 1e-14,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
@@ -902,6 +987,7 @@ mod tests {
             num_qubits: 2,
             ints_per_pauli: 1,
             atol: 1e-12,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
@@ -920,6 +1006,7 @@ mod tests {
             num_qubits: 2,
             ints_per_pauli: 1,
             atol: 0.1,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
@@ -927,6 +1014,25 @@ mod tests {
         assert_eq!(vec![1, 5, 6], cpt_op.paulis);
         assert_eq!(vec![-0.9, 0.55, -0.55], cpt_op.coeffs);
         assert!((trunc_onenorm_atol - 0.103).abs() < 1e-10);
+
+        // Same truncation decisions as above; L2 mode accumulates sum of squares of discarded coeffs.
+        let paulis: Vec<u64> = vec![1, 2, 3, 4, 5, 6];
+        let coeffs: Vec<f64> = vec![-0.9, 0.001, -0.002, 0.1, 0.55, -0.55];
+        let mut cpt_op = CPTOperatorRust {
+            paulis,
+            coeffs,
+            max_terms: 3,
+            num_qubits: 2,
+            ints_per_pauli: 1,
+            atol: 1e-12,
+            trunc_norm: TruncationNorm::L2,
+            paulis_buffer: vec![],
+            coeffs_buffer: vec![],
+        };
+        let trunc_l2_sq: f64 = cpt_op.truncate();
+        let expected_sq = 1e-6 + 4e-9 + 0.01;
+        assert!((trunc_l2_sq - expected_sq).abs() < 1e-14);
+        assert!((TruncationNorm::L2.finalize(trunc_l2_sq) - expected_sq.sqrt()).abs() < 1e-14);
     }
     #[test]
     fn test_insert_or_combine() {
@@ -939,6 +1045,7 @@ mod tests {
             num_qubits: 2,
             ints_per_pauli: 1,
             atol: 1e-12,
+            trunc_norm: TruncationNorm::L1,
             paulis_buffer: vec![],
             coeffs_buffer: vec![],
         };
