@@ -51,7 +51,7 @@ test = [
 ]
 nbtest = [
     "pauli-prop[basetest]",
-    "nbmake>=1.5.0",
+    "nbmake>=1.5.5",
 ]
 style = [
     "ruff==0.15.4",
