@@ -1,13 +1,13 @@
-##########
-Pauli Prop
-##########
+#################
+Pauli propagation
+#################
 
 About
 -----
 
 Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels [1] - [5]. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis. The technique has been used to classically estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to be run on a quantum processor [6]. To learn how to use this package to simulate expectation values of quantum systems, check out the tutorial.
 
-This package provides a Rust-accelerated Python interface for performing Pauli propagation. The subroutines in this package may be used to implement:
+This package provides a Rust-accelerated Python interface for performing Pauli propagation. The subroutines in this package may be used to implement the following:
 
 - Lightcone shading [7] and other novel error mitigation techniques
 - Operator backpropagation (OBP) [6] 
@@ -18,9 +18,9 @@ Technical details
 
 - Rust-accelerated Python interface
 - Support for noisy simulations [`tutorial 3 <https://qiskit.github.io/pauli-prop/tutorials/03_simulate_noisy_expectation_values.html>`_]
-- Ability to truncate terms during evolution based on an absolute coefficient tolerance, a fixed number of terms in the evolving operator, or a combination of both.
-- Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
-- Novel technique for approximating the conjugation of a Pauli-sum operator by another Pauli operator. This heuristic implementation greedily generates contributions to the product expected to be most significant.
+- Ability to truncate terms during evolution based on an absolute coefficient tolerance, a fixed number of terms in the evolving operator, or a combination of both
+- Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks
+- Novel technique for approximating the conjugation of a Pauli-sum operator by another Pauli operator. This heuristic implementation greedily generates contributions to the product expected to be most significant
 - Single-threaded
 
 Computational requirements
@@ -28,22 +28,9 @@ Computational requirements
 
 Both the memory and time cost for Pauli propagation routines generally scale with the size to which the evolved operator is allowed to grow.
 
-``propagate_through_rotation_gates``: As the Pauli operator is propagated in the Pauli basis under the action of a sequence of :math:`N` Pauli rotation gates of an :math:`M`-qubit circuit, the number of terms will grow as :math:`\mathcal{O}(2^N)` towards a maximum of :math:`4^M` unique Pauli components. To control memory usage, the operator is truncated after application of each gate, which introduces some error proportional to the magnitudes of the truncated terms' coefficients. The memory requirements are linear in the size of the evolved operator and runtime scales linearly in both the operator size and the number of gates.
+``propagate_through_rotation_gates``: As the Pauli operator is propagated in the Pauli basis under the action of a sequence of :math:`N` Pauli rotation gates of an :math:`M`-qubit circuit, the number of terms will grow as :math:`\mathcal{O}(2^N)` towards a maximum of :math:`4^M` unique Pauli components. To control memory usage, the operator is truncated after application of each gate, which introduces some error proportional to the magnitudes of the truncated terms' coefficients. The memory requirements are linear in the size of the evolved operator, and runtime scales linearly in both the operator size and the number of gates.
 
 ``propagate_through_operator``: Conjugates one operator in the Pauli basis by another by greedily accumulating terms in the sum, :math:`\sum_{i,j,k}G^{\dagger}_iO_jG_k`, where :math:`i,j,k` are sparse indices over the Pauli basis. This implementation sorts the coefficients in each operator by descending magnitude then searches the 3D index space for the terms with the largest coefficients, starting with the origin :math:`(0,0,0)`, and accumulating :math:`(i,j,k)` triplets up to a specified cutoff. The time spent searching can often be made negligible by increasing the search step size in :math:`(i,j,k)` space, which provides a cubic speedup for this subroutine. In our profiling, significant time can be spent sorting the operators and performing Pauli multiplication to generate the terms in the new operator.
-
-
-Installation
-------------
-
-We encourage installing this package via ``pip``, when possible:
-
-.. code-block:: bash
-
-   pip install pauli-prop
-
-
-For more installation information refer to the `installation instructions <install.rst>`_ in the documentation.
 
 Citing this project
 -------------------
@@ -53,7 +40,7 @@ If you use this package in your research, please cite it according to ``CITATON.
 .. literalinclude:: ../CITATION.bib
    :language: bibtex
 
-Deprecation Policy
+Deprecation policy
 ------------------
 
 We follow `semantic versioning <https://semver.org/>`_ and are guided by the principles in
@@ -66,8 +53,6 @@ release notes.
 
 Contributing
 ------------
-
-The source code is available `on GitHub <https://github.com/Qiskit/pauli-prop>`_.
 
 The developer guide is located at `CONTRIBUTING.md <https://github.com/Qiskit/pauli-prop/blob/main/CONTRIBUTING.md>`_
 in the root of this project's repository.
@@ -98,13 +83,3 @@ References
 [6] Bryce Fuller, et al., `Improved Quantum Computation using Operator Backpropagation <https://arxiv.org/abs/2502.01897>`_, arXiv:2502.01897 [quant-ph].
 
 [7] Andrew Eddins, Minh C. Tran, Patrick Rall, `Lightcone shading for classically accelerated quantum error mitigation <https://arxiv.org/abs/2409.04401>`_, arXiv:2409.04401 [quant-ph].
-
-.. toctree::
-  :hidden:
-   
-   Documentation Home <self>
-   Installation Instructions <install>
-   Tutorials <tutorials/index>
-   How-To Guides <how_tos/index>
-   API Reference <apidocs/index>
-   GitHub <https://github.com/qiskit/pauli-prop>
