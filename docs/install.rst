@@ -1,7 +1,7 @@
 Installation Instructions
 =========================
 
-Pre-installation
+Prerequisites
 ^^^^^^^^^^^^^^^^
 
 First, create a minimal environment with only Python installed in it. We recommend using `Python virtual environments <https://docs.python.org/3.10/tutorial/venv.html>`__.
