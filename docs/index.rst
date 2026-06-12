@@ -83,3 +83,13 @@ References
 [6] Bryce Fuller, et al., `Improved Quantum Computation using Operator Backpropagation <https://arxiv.org/abs/2502.01897>`_, arXiv:2502.01897 [quant-ph].
 
 [7] Andrew Eddins, Minh C. Tran, Patrick Rall, `Lightcone shading for classically accelerated quantum error mitigation <https://arxiv.org/abs/2409.04401>`_, arXiv:2409.04401 [quant-ph].
+
+.. toctree::
+  :hidden:
+   
+   Documentation Home <self>
+   Installation Instructions <install>
+   Tutorials <tutorials/index>
+   How-To Guides <how_tos/index>
+   API Reference <apidocs/index>
+   GitHub <https://github.com/qiskit/pauli-prop>
