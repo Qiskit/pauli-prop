@@ -5,13 +5,14 @@ Pauli Prop
 About
 -----
 
-Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels [1] - [5]. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis. The technique has been used to classically estimate expectation values of quantum systems and also to reduce the depths of quantum circuits to be run on a quantum processor [6]. To learn how to use this package to simulate expectation values of quantum systems, check out the tutorial.
+Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis.
 
 This package provides a Rust-accelerated Python interface for performing Pauli propagation. The subroutines in this package may be used to implement:
 
-- Lightcone shading [7] and other novel error mitigation techniques
-- Operator backpropagation (OBP) [6] 
-- Classical simulation of expectation values [`tutorials <https://qiskit.github.io/pauli-prop/tutorials/index.html>`_]
+- Lightcone shading [6]_
+- Propagated noise absorption [7]_
+- Operator backpropagation (OBP) [8]_ 
+- Classical simulation of expectation values [1]_ [2]_ [3]_ [4]_ [5]_ [`tutorials <https://qiskit.github.io/pauli-prop/tutorials/index.html>`_]
 
 Technical details
 ^^^^^^^^^^^^^^^^^
@@ -83,19 +84,21 @@ License
 References
 ----------
 
-[1] Tomislav Begušić, Johnnie Gray, Garnet Kin-Lic Chan, `Fast and converged classical simulations of evidence for the utility of quantum computing before fault tolerance <https://arxiv.org/abs/2308.05077>`_, arXiv:2308.05077 [quant-ph].
+.. [1] Tomislav Begušić, Johnnie Gray, Garnet Kin-Lic Chan, `Fast and converged classical simulations of evidence for the utility of quantum computing before fault tolerance <https://arxiv.org/abs/2308.05077>`_, arXiv:2308.05077 [quant-ph].
 
-[2] Nicolas Loizeau, et al., `Quantum many-body simulations with PauliStrings.jl <https://arxiv.org/abs/2410.09654>`_, arXiv:2410.09654 [quant-ph].
+.. [2] Nicolas Loizeau, et al., `Quantum many-body simulations with PauliStrings.jl <https://arxiv.org/abs/2410.09654>`_, arXiv:2410.09654 [quant-ph].
 
-[3] Manuel S. Rudolph, et al., `Pauli Propagation: A Computational Framework for Simulating Quantum Systems <https://arxiv.org/abs/2505.21606>`_, arXiv:2505.21606 [quant-ph].
+.. [3] Manuel S. Rudolph, et al., `Pauli Propagation: A Computational Framework for Simulating Quantum Systems <https://arxiv.org/abs/2505.21606>`_, arXiv:2505.21606 [quant-ph].
 
-[4] Hrant Gharibyan, et al., `A Practical Guide to using Pauli Path Simulators for Utility-Scale Quantum Experiments <https://arxiv.org/abs/2507.10771>`_, arXiv:2507.10771 [quant-ph].
+.. [4] Hrant Gharibyan, et al., `A Practical Guide to using Pauli Path Simulators for Utility-Scale Quantum Experiments <https://arxiv.org/abs/2507.10771>`_, arXiv:2507.10771 [quant-ph].
 
-[5] Lukas Broers, et al., `Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra <https://arxiv.org/abs/2506.13241>`_, arXiv:2506.13241 [quant-ph].
+.. [5] Lukas Broers, et al., `Scalable Simulation of Quantum Many-Body Dynamics with Or-Represented Quantum Algebra <https://arxiv.org/abs/2506.13241>`_, arXiv:2506.13241 [quant-ph].
 
-[6] Bryce Fuller, et al., `Improved Quantum Computation using Operator Backpropagation <https://arxiv.org/abs/2502.01897>`_, arXiv:2502.01897 [quant-ph].
+.. [6] Andrew Eddins, Minh C. Tran, Patrick Rall, `Lightcone shading for classically accelerated quantum error mitigation <https://arxiv.org/abs/2409.04401>`_, arXiv:2409.04401 [quant-ph].
 
-[7] Andrew Eddins, Minh C. Tran, Patrick Rall, `Lightcone shading for classically accelerated quantum error mitigation <https://arxiv.org/abs/2409.04401>`_, arXiv:2409.04401 [quant-ph].
+.. [7] Andrew Eddins, et al., `Computing noise-canceling observables via Pauli propagation <https://arxiv.org/abs/2606.20441>`_, arXiv:2606.20441 [quant-ph].
+
+.. [8] Bryce Fuller, et al., `Improved Quantum Computation using Operator Backpropagation <https://arxiv.org/abs/2502.01897>`_, arXiv:2502.01897 [quant-ph].
 
 .. toctree::
   :hidden:
