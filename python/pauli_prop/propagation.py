@@ -14,7 +14,7 @@
 """Functions for performing Pauli propagation."""
 
 import warnings
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -35,6 +35,16 @@ from pauli_prop._accelerate import (
 
 # We intentionally cast the complex coeffs to real
 warnings.filterwarnings("ignore", category=np.exceptions.ComplexWarning)
+
+
+def _normalize_truncation_norm(truncation_norm: str) -> str:
+    """Return ``\"l1\"`` or ``\"l2\"`` or raise ``ValueError``."""
+    lowered = truncation_norm.strip().lower()
+    if lowered not in ("l1", "l2"):
+        raise ValueError(
+            f"truncation_norm must be 'l1' or 'l2', got {truncation_norm!r}"
+        )
+    return lowered
 
 _ROTATION_TO_GENERATOR = {
     "rx": Pauli("X"),
@@ -385,6 +395,8 @@ def propagate_through_rotation_gates(
     max_terms: int,
     atol: float,
     frame: str,
+    *,
+    truncation_norm: Literal["l1", "l2"] = "l1",
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit (represented in ``rot_gates``), :math:`U`.
 
@@ -417,19 +429,24 @@ def propagate_through_rotation_gates(
         frame:
             ``s`` for Schrödinger evolution
             ``h`` for Heisenberg evolution
+        truncation_norm: How to aggregate magnitudes of truncated coefficients into the second return value:
+            ``\"l1\"`` (default) sums absolute values; ``\"l2\"`` returns the square root of the sum of squares of those
+            magnitudes over the full evolution.
 
     Returns:
-        The evolved operator and one-norm of all truncated coefficients.
+        The evolved operator and a scalar truncation metric (see ``truncation_norm``).
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
+        ValueError: ``truncation_norm`` is neither ``\"l1\"`` nor ``\"l2\"``.
     """
     if max_terms < 1:
         raise ValueError("max_terms must be a positive integer.")
     if atol < 0.0:
         raise ValueError("atol must be non-negative.")
+    norm_key = _normalize_truncation_norm(truncation_norm)
     if (isinstance(rot_gates, RotationGates) and len(rot_gates.gates) == 0) or (
         isinstance(rot_gates, NoisyRotationGates) and len(rot_gates.gate_types) == 0
     ):
@@ -444,7 +461,7 @@ def propagate_through_rotation_gates(
     sorted_ids = np.lexsort(pauli_arr[:, ::-1].T)
 
     if isinstance(rot_gates, RotationGates):
-        paulis, coeffs, trunc_onenorm = evolve_by_circuit_r(
+        paulis, coeffs, trunc_metric = evolve_by_circuit_r(
             pauli_arr[sorted_ids],
             operator.coeffs[sorted_ids].astype(np.float64),
             np.array(rot_gates.gates),
@@ -453,6 +470,7 @@ def propagate_through_rotation_gates(
             max_terms,
             atol,
             frame.lower(),
+            truncation_norm=norm_key,
         )
     else:
         assert isinstance(rot_gates, NoisyRotationGates)
@@ -462,7 +480,7 @@ def propagate_through_rotation_gates(
         else:
             gates_array = np.array(rot_gates.gates)
 
-        paulis, coeffs, trunc_onenorm = evolve_by_noisy_circuit_r(
+        paulis, coeffs, trunc_metric = evolve_by_noisy_circuit_r(
             pauli_arr[sorted_ids],
             operator.coeffs[sorted_ids].astype(np.float64),
             gates_array,
@@ -474,6 +492,7 @@ def propagate_through_rotation_gates(
             max_terms,
             atol,
             frame.lower(),
+            truncation_norm=norm_key,
         )
 
     paulis_x = paulis[:, : operator.num_qubits]
@@ -491,7 +510,7 @@ def propagate_through_rotation_gates(
             copy=False,
         )
 
-    return spo_out, trunc_onenorm
+    return spo_out, trunc_metric
 
 
 def propagate_through_circuit(
@@ -500,6 +519,8 @@ def propagate_through_circuit(
     max_terms: int,
     atol: float,
     frame: str,
+    *,
+    truncation_norm: Literal["l1", "l2"] = "l1",
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
@@ -535,17 +556,26 @@ def propagate_through_circuit(
         frame:
             ``s`` for Schrödinger evolution
             ``h`` for Heisenberg evolution
+        truncation_norm: Same as :func:`propagate_through_rotation_gates`.
 
     Returns:
-        The evolved operator
+        The evolved operator and a scalar truncation metric (see ``truncation_norm``).
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
+        ValueError: ``truncation_norm`` is invalid.
     """
     rot_gates = circuit_to_rotation_gates(circuit)
-    return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
+    return propagate_through_rotation_gates(
+        operator,
+        rot_gates,
+        max_terms,
+        atol,
+        frame,
+        truncation_norm=truncation_norm,
+    )
 
 
 def propagate_through_operator(
