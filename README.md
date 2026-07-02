@@ -1,7 +1,5 @@
 # Pauli Prop
 
-### About
-
 Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis
 under the action of other operators, such as quantum circuit gates and noise channels [[1-5]](#references).
 This approach can be effective when the operators involved are expected to remain sparse in the
@@ -13,12 +11,40 @@ subroutines in this package may be used to implement:
 - Lightcone shading [[6]](#references)
 - Propagated noise absorption [[7]](#references)
 - Operator backpropagation (OBP) [[8]](#references) 
-- Classical simulation of expectation values [[tutorials](https://qiskit.github.io/pauli-prop/tutorials/index.html)]
-  
-##### Technical details
+- Classical simulation of expectation values [[1-5]](#references) [[tutorials](https://qiskit.github.io/pauli-prop/tutorials/index.html)]
+
+----------------------------------------------------------------------------------------------------
+
+### Documentation
+
+All documentation is available at https://quantum.cloud.ibm.com/docs/addons/pauli-prop.
+
+----------------------------------------------------------------------------------------------------
+
+### Installation
+
+We encourage installing this package via `pip`, when possible:
+
+```bash
+pip install 'pauli-prop'
+```
+
+For more installation information refer to these [installation instructions](docs/install.rst).
+
+----------------------------------------------------------------------------------------------------
+
+### Getting started
+
+Take a look at the [guides][docs/guides/) for examples of how to use the package to classically simulate expectation values.
+
+----------------------------------------------------------------------------------------------------
+
+### Technical discussion
+
+#### Software details
 
 - Rust-accelerated Python interface
-- Support for noisy simulations [[tutorial 3](https://qiskit.github.io/pauli-prop/tutorials/03_simulate_noisy_expectation_values.html)]
+- Support for noisy simulations [[tutorial 3]](docs/guides/03_simulate_noisy_expectation_values.html)]
 - Ability to truncate operator terms during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
@@ -26,7 +52,7 @@ tolerance, a fixed number of terms in the evolving operator, or a combination of
 implementation greedily generates contributions to the product expected to be most significant.
 - Current implementation is single-threaded
 
-##### Computational requirements
+#### Computational requirements
 
 Both the memory and time cost for Pauli propagation routines generally scale with the size to which
 the evolved operator is allowed to grow.
@@ -50,36 +76,6 @@ sorting the operators and performing Pauli multiplication to generate the terms 
 
 ----------------------------------------------------------------------------------------------------
 
-### Documentation
-
-All documentation is available at https://qiskit.github.io/pauli-prop/.
-
-----------------------------------------------------------------------------------------------------
-
-### Installation
-
-We encourage installing the package via `pip`, when possible:
-
-```bash
-pip install pauli-prop
-```
-
-For more installation information refer to these [installation instructions](docs/install.rst).
-
-----------------------------------------------------------------------------------------------------
-
-### Deprecation Policy
-
-We follow [semantic versioning](https://semver.org/) and are guided by the principles in
-[Qiskit's deprecation policy](https://github.com/Qiskit/qiskit/blob/main/DEPRECATION.md).
-We may occasionally make breaking changes in order to improve the user experience.
-When possible, we will keep old interfaces and mark them as deprecated, as long as they can co-exist with the
-new ones.
-Each substantial improvement, breaking change, or deprecation will be documented in the
-[release notes](https://qiskit.github.io/pauli-prop/release-notes.html).
-
-----------------------------------------------------------------------------------------------------
-
 ### Contributing
 
 The source code is available [on GitHub](https://github.com/Qiskit/pauli-prop).
@@ -90,9 +86,24 @@ By participating, you are expected to uphold Qiskit's [code of conduct](https://
 
 ----------------------------------------------------------------------------------------------------
 
+### Citing this package
+
+If you use this package in your research, use the [CITATION.bib](CITATION.bib) file in this project’s repository to cite the appropriate reference(s).
+
+----------------------------------------------------------------------------------------------------
+
 ### License
 
 [Apache License 2.0](LICENSE.txt)
+
+----------------------------------------------------------------------------------------------------
+
+### Deprecation policy
+
+We follow [semantic versioning](https://semver.org/). We may occasionally make breaking changes in
+order to improve the user experience. When possible, we will keep old interfaces and mark them as
+deprecated, as long as they can co-exist with the new ones. Each substantial improvement, breaking
+change, or deprecation will be documented in the [release notes](https://quantum.cloud.ibm.com/docs/api/pauli-prop/release-notes).
 
 ----------------------------------------------------------------------------------------------------
 
