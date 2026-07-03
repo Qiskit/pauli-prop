@@ -1,37 +1,70 @@
-# Pauli Prop
+# Pauli Propagation
 
-### About
+The `pauli-prop` package provides a Rust-accelerated Python interface for performing Pauli propagation.
 
 Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis
 under the action of other operators, such as quantum circuit gates and noise channels [[1-5]](#references).
 This approach can be effective when the operators involved are expected to remain sparse in the
 Pauli basis.
 
-This package provides a Rust-accelerated Python interface for performing Pauli propagation. The
-subroutines in this package may be used to implement:
+The subroutines in this package may be used to implement error mitigation techniques such as [lightcone shading](https://github.com/Qiskit/qiskit-addon-slc) [[6]](#references) and [propagated noise absorption](https://github.com/Qiskit/qiskit-addon-pna) [[7]](#references), [operator backpropagation](https://github.com/Qiskit/qiskit-addon-obp) [[8]](#references) for circuit depth reduction, and classical simulation of expectation values [[1-5]](#references).
 
-- Lightcone shading [[6]](#references)
-- Propagated noise absorption [[7]](#references)
-- Operator backpropagation (OBP) [[8]](#references) 
-- Classical simulation of expectation values [[tutorials](https://qiskit.github.io/pauli-prop/tutorials/index.html)]
-  
-##### Technical details
+----------------------------------------------------------------------------------------------------
+
+### Documentation
+
+All documentation is available at https://quantum.cloud.ibm.com/docs/addons/pauli-prop.
+
+----------------------------------------------------------------------------------------------------
+
+### Installation
+
+We encourage installing this package via `pip`, when possible:
+
+```bash
+pip install 'pauli-prop'
+```
+
+For more installation information refer to these [installation instructions](docs/install.rst).
+
+----------------------------------------------------------------------------------------------------
+
+### Getting started
+
+A simple guide to help you get started quickly with this package is available in the [quickstart guide](docs/guides/quickstart.ipynb).
+
+----------------------------------------------------------------------------------------------------
+
+### Use case examples
+
+Pauli propagation can be used as a lower-level engine to implement a variety of techniques. Some examples of where this has been used are:
+
+- Lightcone shading to reduce the sampling overhead of probabilistic error cancellation (PEC) for mitigating expectation values in a 1- and 2D transverse field Ising model [[6]](#references)
+- Absorbing noise model information into a target observable to mitigate expectation values in a 2D transverse field Ising model [[7]](#references)
+- Trimming trailing gates to produce lower-depth Trotter circuits for the time-evolution of a 2D spin model [[8]](#references)
+
+----------------------------------------------------------------------------------------------------
+
+### Technical discussion
+
+#### Software details
 
 - Rust-accelerated Python interface
-- Support for noisy simulations [[tutorial 3](https://qiskit.github.io/pauli-prop/tutorials/03_simulate_noisy_expectation_values.html)]
+- Support for noisy simulations [[tutorial 3]](docs/guides/simulate_noisy_expectation_values.ipynb)]
 - Ability to truncate operator terms during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
 - Novel technique for approximating the conjugation of two Pauli-sum operators. This heuristic
-implementation greedily generates contributions to the product expected to be most significant.
+implementation greedily generates contributions to the product expected to be most significant. See
+section B of [[7]](#references) for more information.
 - Current implementation is single-threaded
 
-##### Computational requirements
+#### Computational requirements
 
 Both the memory and time cost for Pauli propagation routines generally scale with the size to which
 the evolved operator is allowed to grow.
 
-``propagate_through_rotation_gates``: As the Pauli operator is propagated in the Pauli basis under
+[`propagate_through_rotation_gates`](https://quantum.cloud.ibm.com/docs/api/pauli-prop/pauli-prop-propagation#propagate_through_rotation_gates): As the Pauli operator is propagated in the Pauli basis under
 the action of a sequence of $N$ Pauli rotation gates of an $M$-qubit circuit, the number of terms
 will grow as $\mathcal{O}(2^{N})$ towards a maximum of $4^M$ unique Pauli components. To control
 the memory usage, the operator is truncated after application of each gate, which introduces some
@@ -39,7 +72,7 @@ error proportional to the magnitudes of the truncated terms' coefficients. The m
 are generally linear in the size of the evolved operator and runtime scales linearly in both the
 operator size and the number of gates.
 
-``propagate_through_operator``: Conjugates one operator in the Pauli basis by another by greedily
+[`propagate_through_operator`](https://quantum.cloud.ibm.com/docs/api/pauli-prop/pauli-prop-propagation#propagate_through_operator): Conjugates one operator in the Pauli basis by another by greedily
 accumulating terms in the sum, $\sum_{i,j,k}G^{\dagger}_iO_jG_k$, where $i,j,k$ are sparse indices
 over the Pauli basis. This implementation sorts the coefficients in each operator by descending
 magnitude then searches the 3D index space for the terms with the largest coefficients, starting
@@ -47,36 +80,6 @@ with the origin, $(0, 0, 0)$, and accumulating $(i,j,k)$ triplets up to a specif
 spent searching can often be made negligible by increasing the search step size in $(i,j,k)$ space,
 which provides a cubic speedup for this subroutine. In our profiling, significant time can be spent
 sorting the operators and performing Pauli multiplication to generate the terms in the new operator.
-
-----------------------------------------------------------------------------------------------------
-
-### Documentation
-
-All documentation is available at https://qiskit.github.io/pauli-prop/.
-
-----------------------------------------------------------------------------------------------------
-
-### Installation
-
-We encourage installing the package via `pip`, when possible:
-
-```bash
-pip install pauli-prop
-```
-
-For more installation information refer to these [installation instructions](docs/install.rst).
-
-----------------------------------------------------------------------------------------------------
-
-### Deprecation Policy
-
-We follow [semantic versioning](https://semver.org/) and are guided by the principles in
-[Qiskit's deprecation policy](https://github.com/Qiskit/qiskit/blob/main/DEPRECATION.md).
-We may occasionally make breaking changes in order to improve the user experience.
-When possible, we will keep old interfaces and mark them as deprecated, as long as they can co-exist with the
-new ones.
-Each substantial improvement, breaking change, or deprecation will be documented in the
-[release notes](https://qiskit.github.io/pauli-prop/release-notes.html).
 
 ----------------------------------------------------------------------------------------------------
 
@@ -90,9 +93,24 @@ By participating, you are expected to uphold Qiskit's [code of conduct](https://
 
 ----------------------------------------------------------------------------------------------------
 
+### Citing this package
+
+If you use this package in your research, use the [CITATION.bib](CITATION.bib) file in this project’s repository to cite the appropriate reference(s).
+
+----------------------------------------------------------------------------------------------------
+
 ### License
 
 [Apache License 2.0](LICENSE.txt)
+
+----------------------------------------------------------------------------------------------------
+
+### Deprecation policy
+
+We follow [semantic versioning](https://semver.org/). We may occasionally make breaking changes in
+order to improve the user experience. When possible, we will keep old interfaces and mark them as
+deprecated, as long as they can co-exist with the new ones. Each substantial improvement, breaking
+change, or deprecation will be documented in the [release notes](https://quantum.cloud.ibm.com/docs/api/pauli-prop/release-notes).
 
 ----------------------------------------------------------------------------------------------------
 
