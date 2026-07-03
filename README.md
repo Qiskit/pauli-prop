@@ -7,7 +7,7 @@ under the action of other operators, such as quantum circuit gates and noise cha
 This approach can be effective when the operators involved are expected to remain sparse in the
 Pauli basis.
 
-The subroutines in this package may be used to implement error mitigation techniques such as [lightcone shading](https://github.com/Qiskit/qiskit-addon-slc) [[6]](#references) and [propagated noise absorption](https://github.com/Qiskit/qiskit-addon-pna) [[7]](#references), [operator backpropagation](https://github.com/Qiskit/qiskit-addon-obp) [[8]](#references) for circuit depth reduction, and classical simulation of expectation values [[1-5]](#references) [[guides]](https://quantum.cloud.ibm.com/docs/addons/pauli-prop/guides).
+The subroutines in this package may be used to implement error mitigation techniques such as [lightcone shading](https://github.com/Qiskit/qiskit-addon-slc) [[6]](#references) and [propagated noise absorption](https://github.com/Qiskit/qiskit-addon-pna) [[7]](#references), [operator backpropagation](https://github.com/Qiskit/qiskit-addon-obp) [[8]](#references) for circuit depth reduction, and classical simulation of expectation values [[1-5]](#references).
 
 ----------------------------------------------------------------------------------------------------
 
@@ -55,7 +55,8 @@ Pauli propagation can be used as a lower-level engine to implement a variety of 
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.
 - Novel technique for approximating the conjugation of two Pauli-sum operators. This heuristic
-implementation greedily generates contributions to the product expected to be most significant.
+implementation greedily generates contributions to the product expected to be most significant. See
+section B of [[7]](#references) for more information.
 - Current implementation is single-threaded
 
 #### Computational requirements
@@ -63,7 +64,7 @@ implementation greedily generates contributions to the product expected to be mo
 Both the memory and time cost for Pauli propagation routines generally scale with the size to which
 the evolved operator is allowed to grow.
 
-``propagate_through_rotation_gates``: As the Pauli operator is propagated in the Pauli basis under
+[`propagate_through_rotation_gates`](https://quantum.cloud.ibm.com/docs/api/pauli-prop/pauli-prop-propagation#propagate_through_rotation_gates): As the Pauli operator is propagated in the Pauli basis under
 the action of a sequence of $N$ Pauli rotation gates of an $M$-qubit circuit, the number of terms
 will grow as $\mathcal{O}(2^{N})$ towards a maximum of $4^M$ unique Pauli components. To control
 the memory usage, the operator is truncated after application of each gate, which introduces some
@@ -71,7 +72,7 @@ error proportional to the magnitudes of the truncated terms' coefficients. The m
 are generally linear in the size of the evolved operator and runtime scales linearly in both the
 operator size and the number of gates.
 
-``propagate_through_operator``: Conjugates one operator in the Pauli basis by another by greedily
+[`propagate_through_operator`](https://quantum.cloud.ibm.com/docs/api/pauli-prop/pauli-prop-propagation#propagate_through_operator): Conjugates one operator in the Pauli basis by another by greedily
 accumulating terms in the sum, $\sum_{i,j,k}G^{\dagger}_iO_jG_k$, where $i,j,k$ are sparse indices
 over the Pauli basis. This implementation sorts the coefficients in each operator by descending
 magnitude then searches the 3D index space for the terms with the largest coefficients, starting
