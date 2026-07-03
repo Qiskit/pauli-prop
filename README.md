@@ -1,17 +1,13 @@
-# Pauli Prop
+# Pauli Propagation
+
+The `pauli-prop` package provides a Rust-accelerated Python interface for performing Pauli propagation.
 
 Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis
 under the action of other operators, such as quantum circuit gates and noise channels [[1-5]](#references).
 This approach can be effective when the operators involved are expected to remain sparse in the
 Pauli basis.
 
-This package provides a Rust-accelerated Python interface for performing Pauli propagation. The
-subroutines in this package may be used to implement:
-
-- Lightcone shading [[6]](#references)
-- Propagated noise absorption [[7]](#references)
-- Operator backpropagation (OBP) [[8]](#references) 
-- Classical simulation of expectation values [[1-5]](#references) [[tutorials](https://qiskit.github.io/pauli-prop/tutorials/index.html)]
+The subroutines in this package may be used to implement error mitigation techniques such as [lightcone shading](https://github.com/Qiskit/qiskit-addon-slc) [[6]](#references) and [propagated noise absorption](https://github.com/Qiskit/qiskit-addon-pna) [[7]](#references), [operator backpropagation](https://github.com/Qiskit/qiskit-addon-obp) [[8]](#references) for circuit depth reduction, and classical simulation of expectation values [[1-5]](#references) [[guides]](https://quantum.cloud.ibm.com/docs/addons/pauli-prop/guides).
 
 ----------------------------------------------------------------------------------------------------
 
@@ -35,7 +31,17 @@ For more installation information refer to these [installation instructions](doc
 
 ### Getting started
 
-Take a look at the [guides][docs/guides/) for examples of how to use the package to classically simulate expectation values.
+A simple guide to help you get started quickly with this package is available in the [quickstart guide](docs/guides/quickstart.ipynb).
+
+----------------------------------------------------------------------------------------------------
+
+### Use case examples
+
+Pauli propagation can be used as a lower-level engine to implement a variety of techniques. Some examples of where this has been used are:
+
+- Lightcone shading to reduce the sampling overhead of probabilistic error cancellation (PEC) for mitigating expectation values in a 1- and 2D transverse field Ising model [[6]](#references)
+- Absorbing noise model information into a target observable to mitigate expectation values in a 2D transverse field Ising model [[7]](#references)
+- Trimming trailing gates to produce lower-depth Trotter circuits for the time-evolution of a 2D spin model [[8]](#references)
 
 ----------------------------------------------------------------------------------------------------
 
@@ -44,7 +50,7 @@ Take a look at the [guides][docs/guides/) for examples of how to use the package
 #### Software details
 
 - Rust-accelerated Python interface
-- Support for noisy simulations [[tutorial 3]](docs/guides/03_simulate_noisy_expectation_values.html)]
+- Support for noisy simulations [[tutorial 3]](docs/guides/simulate_noisy_expectation_values.ipynb)]
 - Ability to truncate operator terms during evolution based on an absolute coefficient
 tolerance, a fixed number of terms in the evolving operator, or a combination of both.
 - Ability to perform Pauli propagation in both the Schrödinger and Heisenberg frameworks.

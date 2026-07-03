@@ -2,19 +2,25 @@
 Pauli propagation
 #################
 
+The ``pauli-prop`` package provides a Rust-accelerated Python interface for performing Pauli propagation.
+
 Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis.
 
-This package provides a Rust-accelerated Python interface for performing Pauli propagation. The subroutines in this package may be used to implement the following:
-
-- Lightcone shading `[6] <ref6_>`_
-- Propagated noise absorption `[7] <ref7>`_
-- Operator backpropagation (OBP) `[8] <ref8>`_ 
-- Classical simulation of expectation values `[1–5] <references_>`_ [`guides <https://quantum.cloud.ibm.com/docs/addons/pauli-prop/guides/>`_]
+The subroutines in this package may be used to implement error mitigation techniques such as `lightcone shading <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-slc>`_ `[6] <ref6_>`_ and `propagated noise absorption <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-pna>`_ `[7] <ref7_>`_, `operator backpropagation <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-obp>`_ `[8] <ref8_>`_ for circuit depth reduction, and classical simulation of expectation values `[1-5] <references_>`_ `[guides] <https://quantum.cloud.ibm.com/docs/addons/pauli-prop/guides>`_.
 
 Getting started
 ---------------
 
-Take a look at the `guides <https://quantum.cloud.ibm.com/docs/addons/pauli-prop/guides/>`_ for examples of how to use the package to classically simulate expectation values.
+A simple guide to help you get started quickly with this package is available in the :doc:`quickstart guide <guides/quickstart>`.
+
+Use case examples
+-----------------
+
+Pauli propagation can be used as a lower-level engine to implement a variety of techniques. Some examples of where this has been used are:
+
+- Lightcone shading to reduce the sampling overhead of probabilistic error cancellation (PEC) for mitigating expectation values in a 1- and 2D transverse field Ising model `[6] <ref6_>`_ `[docs] <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-slc>`__
+- Absorbing noise model information into a target observable to mitigate expectation values in a 2D transverse field Ising model `[7] <ref7_>`_ `[docs] <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-pna>`__
+- Trimming trailing gates to produce lower-depth Trotter circuits for the time-evolution of a 2D spin model `[8] <ref8_>`_ `[docs] <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-obp>`__
 
 Technical discussion
 --------------------
