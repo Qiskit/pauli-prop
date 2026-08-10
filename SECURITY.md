@@ -10,7 +10,7 @@ For example, if the most recent release is 0.2.1, then the 0.2.x release series 
 To report vulnerabilities, you can privately report a potential security issue
 via the GitHub security vulnerabilities feature. This can be done here:
 
-https://github.com/Qiskit/qiskit-addon-sqd/security/advisories
+https://github.com/Qiskit/pauli-prop/security/advisories
 
 Please do **not** open a public issue about a potential security vulnerability.
 
