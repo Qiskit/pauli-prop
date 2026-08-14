@@ -538,16 +538,17 @@ def propagate_through_circuit(
         ValueError: ``max_terms`` is not positive.
     """
     clifford_prefix, circuit_new = evolve_through_cliffords(circuit)
-    if frame == 's':
-        paulis = operator.paulis.evolve(clifford_prefix, frame='s')
+    if frame == "s":
+        paulis = operator.paulis.evolve(clifford_prefix, frame="s")
         operator = SparsePauliOp(paulis, operator.coeffs, copy=False, ignore_pauli_phase=False)
     rot_gates = circuit_to_rotation_gates(circuit_new)
-    operator, trunc_onenorm = propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
-    if frame == 'h':
-        paulis = operator.paulis.evolve(clifford_prefix, frame='h')
+    operator, trunc_onenorm = propagate_through_rotation_gates(
+        operator, rot_gates, max_terms, atol, frame
+    )
+    if frame == "h":
+        paulis = operator.paulis.evolve(clifford_prefix, frame="h")
         operator = SparsePauliOp(paulis, operator.coeffs, copy=False, ignore_pauli_phase=False)
     return operator, trunc_onenorm
-
 
 
 def propagate_through_operator(
