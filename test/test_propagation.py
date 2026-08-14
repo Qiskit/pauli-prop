@@ -67,6 +67,40 @@ class TestPropagation(unittest.TestCase):
         expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
         assert_allclose(evolved_coeffs, expected_coeffs)
 
+    def test_propagate_through_circuit_with_cliffords_matches_matrix(self):
+            """The Rust accelerated evolution should agree with matrix conjugation."""
+    
+            circuit = QuantumCircuit(2)
+            circuit.h(0)
+            circuit.cx(0,1)
+            circuit.ry(math.pi / 3, 0)
+            circuit.ry(-math.pi / 6, 1)
+            circuit.dcx(0,1)
+            circuit.sdg(0)
+            circuit.barrier(0,1)
+            circuit.h([0,1])
+
+            operator = SparsePauliOp.from_list([("ZZ", 1.0),("XY",-1.0)])
+            unitary = Operator(circuit).data
+
+            for frame in ['s','h']:
+                evolved, trunc_norm = propagate_through_circuit(
+                    operator, circuit, max_terms=8, atol=1e-12, frame=frame
+                )
+                if frame == 's':
+                    expected_matrix = unitary @ operator.to_matrix() @ unitary.conj().T
+                elif frame == 'h':
+                    expected_matrix = unitary.conj().T @ operator.to_matrix() @ unitary
+                expected = SparsePauliOp.from_operator(expected_matrix, atol=1e-12, rtol=0.0)
+    
+                self.assertEqual(trunc_norm, 0.0)
+                evolved_dict = _pauli_dict(evolved)
+                expected_dict = _pauli_dict(expected)
+                self.assertSetEqual(set(evolved_dict.keys()), set(expected_dict.keys()))
+                evolved_coeffs = np.array([evolved_dict[key] for key in sorted(evolved_dict)])
+                expected_coeffs = np.array([expected_dict[key] for key in sorted(expected_dict)])
+                assert_allclose(evolved_coeffs, expected_coeffs)
+
     def test_propagate_through_rotation_gates_heisenberg(self):
         """Heisenberg frame evolution should align with direct calculation."""
 
