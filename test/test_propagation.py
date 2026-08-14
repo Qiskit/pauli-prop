@@ -69,7 +69,7 @@ class TestPropagation(unittest.TestCase):
 
     def test_propagate_through_circuit_with_cliffords_matches_matrix(self):
             """The Rust accelerated evolution should agree with matrix conjugation."""
-    
+
             circuit = QuantumCircuit(2)
             circuit.h(0)
             circuit.cx(0,1)
@@ -92,7 +92,7 @@ class TestPropagation(unittest.TestCase):
                 elif frame == 'h':
                     expected_matrix = unitary.conj().T @ operator.to_matrix() @ unitary
                 expected = SparsePauliOp.from_operator(expected_matrix, atol=1e-12, rtol=0.0)
-    
+
                 self.assertEqual(trunc_norm, 0.0)
                 evolved_dict = _pauli_dict(evolved)
                 expected_dict = _pauli_dict(expected)
