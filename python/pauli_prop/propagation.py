@@ -20,7 +20,7 @@ import numpy as np
 import numpy.typing as npt
 from qiskit.circuit import CircuitInstruction, QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import Clifford, Operator, Pauli, PauliList, SparsePauliOp
+from qiskit.quantum_info import Clifford, Operator, Pauli, PauliList, SparsePauliOp, get_clifford_gate_names
 from qiskit_aer.noise import PauliLindbladError
 
 from pauli_prop._accelerate import (
@@ -45,21 +45,7 @@ _ROTATION_TO_GENERATOR = {
     "rzz": Pauli("ZZ"),
 }
 
-KNOWN_CLIFFS = {
-    "cx",
-    "cz",
-    "s",
-    "sdg",
-    "sx",
-    "sxdg",
-    "h",
-    "i",
-    "x",
-    "y",
-    "z",
-    "cy",
-    "ecr",
-}
+KNOWN_CLIFFS = set(get_clifford_gate_names())
 
 
 def _commutation_matrix(pl1: PauliList, pl2: PauliList, negate=False):
