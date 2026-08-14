@@ -116,7 +116,7 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
             peg = PauliEvolutionGate(pauli, pauli_evo_angle)
             non_cliffords.append(peg, qargs=support, copy=False)
         elif circ_inst.name == "PauliEvolution":
-            non_cliffords.append(circ_inst, copy=False)
+            non_cliffords.append(circ_inst, copy=True)
         elif circ_inst.name == "quantum_channel" and hasattr(circ_inst.operation, "_quantum_error"):
             # Pauli-Lindblad channel:
             error = circ_inst.operation._quantum_error
