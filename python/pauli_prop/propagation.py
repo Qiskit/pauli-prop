@@ -523,7 +523,7 @@ def propagate_through_circuit(
             ``h`` for Heisenberg evolution
 
     Returns:
-        The evolved operator
+        A tuple containing the evolved operator, and the one-norm of all truncated coefficients.
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
