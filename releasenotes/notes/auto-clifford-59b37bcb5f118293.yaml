@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Previously, the user typically needed to apply ``evolve_through_cliffords`` on a circuit before passing it to ``propagate_through_circuit``, and also manually apply the resulting ``Clifford``. Now, ``propagate_through_circuit`` does this Clifford processing internally, making it much simpler to use.

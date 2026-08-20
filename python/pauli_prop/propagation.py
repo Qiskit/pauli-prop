@@ -20,7 +20,14 @@ import numpy as np
 import numpy.typing as npt
 from qiskit.circuit import CircuitInstruction, QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import Clifford, Operator, Pauli, PauliList, SparsePauliOp
+from qiskit.quantum_info import (
+    Clifford,
+    Operator,
+    Pauli,
+    PauliList,
+    SparsePauliOp,
+    get_clifford_gate_names,
+)
 from qiskit_aer.noise import PauliLindbladError
 
 from pauli_prop._accelerate import (
@@ -45,21 +52,7 @@ _ROTATION_TO_GENERATOR = {
     "rzz": Pauli("ZZ"),
 }
 
-KNOWN_CLIFFS = {
-    "cx",
-    "cz",
-    "s",
-    "sdg",
-    "sx",
-    "sxdg",
-    "h",
-    "i",
-    "x",
-    "y",
-    "z",
-    "cy",
-    "ecr",
-}
+KNOWN_CLIFFS = set(get_clifford_gate_names())
 
 
 def _commutation_matrix(pl1: PauliList, pl2: PauliList, negate=False):
@@ -122,6 +115,8 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
             # Collect in non_cliffords circuit as Pauli rotation
             peg = PauliEvolutionGate(pauli, pauli_evo_angle)
             non_cliffords.append(peg, qargs=support, copy=False)
+        elif circ_inst.name == "PauliEvolution":
+            non_cliffords.append(circ_inst, copy=True)
         elif circ_inst.name == "quantum_channel" and hasattr(circ_inst.operation, "_quantum_error"):
             # Pauli-Lindblad channel:
             error = circ_inst.operation._quantum_error
@@ -503,7 +498,7 @@ def propagate_through_circuit(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
-    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate'), standard Clifford gates, and Pauli-Lindblad
     error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
@@ -526,6 +521,12 @@ def propagate_through_circuit(
         responsibility to ensure they have enough memory to hold operators containing ``max_terms`` terms. When ``max_terms`` is
         ``None``, the memory and time requirements typically grow exponentially with the number of operations in the circuit.
 
+    .. note::
+        This function first calls ``evolve_through_cliffords`` to process all Clifford gates in the circuit. In use cases that call
+        ``propagate_through_circuit`` repeatedly, e.g. for multiple operators or for multiple values of a parameterized circuit, it
+        may save time to process the Clifford gates just once using ``evolve_through_cliffords`` in advance, and passing the result
+        to ``propagate_through_circuit``. Note the operator will need to be evolved through the resulting ``Clifford`` as well.
+
     Args:
         operator: The operator to propagate
         circuit: The circuit through which the operator will be propagated
@@ -537,15 +538,29 @@ def propagate_through_circuit(
             ``h`` for Heisenberg evolution
 
     Returns:
-        The evolved operator
+        A tuple containing the evolved operator, and the one-norm of all truncated coefficients.
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
     """
-    rot_gates = circuit_to_rotation_gates(circuit)
-    return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
+    clifford_prefix, circuit_new = evolve_through_cliffords(circuit)
+    if frame == "s":
+        paulis = operator.paulis.evolve(clifford_prefix, frame="s")
+        operator = SparsePauliOp(
+            paulis, operator.coeffs.copy(), copy=False, ignore_pauli_phase=False
+        )
+    rot_gates = circuit_to_rotation_gates(circuit_new)
+    operator, trunc_onenorm = propagate_through_rotation_gates(
+        operator, rot_gates, max_terms, atol, frame
+    )
+    if frame == "h":
+        paulis = operator.paulis.evolve(clifford_prefix, frame="h")
+        operator = SparsePauliOp(
+            paulis, operator.coeffs.copy(), copy=False, ignore_pauli_phase=False
+        )
+    return operator, trunc_onenorm
 
 
 def propagate_through_operator(
