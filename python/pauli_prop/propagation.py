@@ -20,7 +20,14 @@ import numpy as np
 import numpy.typing as npt
 from qiskit.circuit import CircuitInstruction, QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import Clifford, Operator, Pauli, PauliList, SparsePauliOp
+from qiskit.quantum_info import (
+    Clifford,
+    Operator,
+    Pauli,
+    PauliList,
+    SparsePauliOp,
+    get_clifford_gate_names,
+)
 from qiskit_aer.noise import PauliLindbladError
 
 from pauli_prop._accelerate import (
@@ -45,21 +52,7 @@ _ROTATION_TO_GENERATOR = {
     "rzz": Pauli("ZZ"),
 }
 
-KNOWN_CLIFFS = {
-    "cx",
-    "cz",
-    "s",
-    "sdg",
-    "sx",
-    "sxdg",
-    "h",
-    "i",
-    "x",
-    "y",
-    "z",
-    "cy",
-    "ecr",
-}
+KNOWN_CLIFFS = set(get_clifford_gate_names())
 
 
 def _commutation_matrix(pl1: PauliList, pl2: PauliList, negate=False):
@@ -103,15 +96,23 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
         qargs = [circuit.find_bit(qubit).index for qubit in circ_inst.qubits]
         if circ_inst.name in KNOWN_CLIFFS:
             net_clifford = net_clifford.dot(circ_inst.operation, qargs)
-        elif circ_inst.name in _ROTATION_TO_GENERATOR:
-            # Pauli rotation gate:
-            pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+        elif circ_inst.name in _ROTATION_TO_GENERATOR or circ_inst.name == "PauliEvolution":
+            if circ_inst.name in _ROTATION_TO_GENERATOR:
+                # Pauli rotation gate:
+                pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+                pauli_evo_angle = circ_inst.params[0] / 2
+            else:
+                # PauliEvolutionGate:
+                operator = circ_inst.operation.operator
+                assert len(operator.paulis) == 1
+                pauli = operator.paulis[0]
+                # Fold the (real) coefficient of the term into the evolution time
+                pauli_evo_angle = circ_inst.params[0] * operator.coeffs[0].real
             # Expand to full width of the circuit:
             pauli = id_pauli.dot(pauli, qargs=qargs)
             # Evolve by all subsequent Cliffords:
             # For large circuits, faster to evolve by net_clifford than by individual gates
             pauli = pauli.evolve(net_clifford, frame="s")
-            pauli_evo_angle = circ_inst.params[0] / 2
             if pauli.phase == 2:
                 pauli_evo_angle *= -1
                 pauli.phase = 0
@@ -187,9 +188,11 @@ class RotationGates(NamedTuple):
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
-            assert len(inst.operation.operator.paulis) == 1
-            rotation_pauli = inst.operation.operator.paulis[0]
-            theta *= 2.0
+            operator = inst.operation.operator
+            assert len(operator.paulis) == 1
+            rotation_pauli = operator.paulis[0]
+            # Fold the (real) coefficient of the term into the rotation angle
+            theta *= 2.0 * operator.coeffs[0].real
 
         rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
 
@@ -311,9 +314,11 @@ class NoisyRotationGates(NamedTuple):
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
-            assert len(inst.operation.operator.paulis) == 1
-            rotation_pauli = inst.operation.operator.paulis[0]
-            theta *= 2.0
+            operator = inst.operation.operator
+            assert len(operator.paulis) == 1
+            rotation_pauli = operator.paulis[0]
+            # Fold the (real) coefficient of the term into the rotation angle
+            theta *= 2.0 * operator.coeffs[0].real
 
         rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
 
@@ -503,7 +508,7 @@ def propagate_through_circuit(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
-    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate'), standard Clifford gates, and Pauli-Lindblad
     error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
@@ -526,6 +531,12 @@ def propagate_through_circuit(
         responsibility to ensure they have enough memory to hold operators containing ``max_terms`` terms. When ``max_terms`` is
         ``None``, the memory and time requirements typically grow exponentially with the number of operations in the circuit.
 
+    .. note::
+        This function first calls ``evolve_through_cliffords`` to process all Clifford gates in the circuit. In use cases that call
+        ``propagate_through_circuit`` repeatedly, e.g. for multiple operators or for multiple values of a parameterized circuit, it
+        may save time to process the Clifford gates just once using ``evolve_through_cliffords`` in advance, and passing the result
+        to ``propagate_through_circuit``. Note the operator will need to be evolved through the resulting ``Clifford`` as well.
+
     Args:
         operator: The operator to propagate
         circuit: The circuit through which the operator will be propagated
@@ -537,15 +548,29 @@ def propagate_through_circuit(
             ``h`` for Heisenberg evolution
 
     Returns:
-        The evolved operator
+        A tuple containing the evolved operator, and the one-norm of all truncated coefficients.
 
     Raises:
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
     """
-    rot_gates = circuit_to_rotation_gates(circuit)
-    return propagate_through_rotation_gates(operator, rot_gates, max_terms, atol, frame)
+    clifford_prefix, circuit_new = evolve_through_cliffords(circuit)
+    if frame == "s":
+        paulis = operator.paulis.evolve(clifford_prefix, frame="s")
+        operator = SparsePauliOp(
+            paulis, operator.coeffs.copy(), copy=False, ignore_pauli_phase=False
+        )
+    rot_gates = circuit_to_rotation_gates(circuit_new)
+    operator, trunc_onenorm = propagate_through_rotation_gates(
+        operator, rot_gates, max_terms, atol, frame
+    )
+    if frame == "h":
+        paulis = operator.paulis.evolve(clifford_prefix, frame="h")
+        operator = SparsePauliOp(
+            paulis, operator.coeffs.copy(), copy=False, ignore_pauli_phase=False
+        )
+    return operator, trunc_onenorm
 
 
 def propagate_through_operator(

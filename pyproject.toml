@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pauli-prop"
-version = "0.2.0"
+version = "0.2.1"
 readme = "README.md"
 description = "Library for performing Pauli propagation."
 license = {file = "LICENSE.txt"}
@@ -86,8 +86,8 @@ docs = [
 ]
 
 [tool.cibuildwheel]
-manylinux-x86_64-image = "manylinux2014"
-manylinux-aarch64-image = "manylinux2014"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
 build = "cp310-*"
 skip = "*musllinux* *win32 *i686"
 test-skip = "*win32 *linux_i686"

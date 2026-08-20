@@ -1,10 +1,7 @@
-Installation Instructions
+Installation instructions
 =========================
 
-Let's see how to install the package. The first thing to do is ensure your Python environment
-is set up correctly. To create a new environment:
-
-Pre-Installation
+Prerequisites
 ^^^^^^^^^^^^^^^^
 
 First, create a minimal environment with only Python installed in it. We recommend using `Python virtual environments <https://docs.python.org/3.10/tutorial/venv.html>`__.
@@ -29,12 +26,12 @@ Install from PyPI
     pip install pauli-prop
 
 
-Install from Source
+Install from source
 ^^^^^^^^^^^^^^^^^^^
 
-Users who wish to develop in the repository or run the notebooks locally may want to install from source.
+You can install from source if you want to develop in the repository or run the notebooks locally.
 
-If so, the first step is to clone the ``pauli-prop`` repository.
+First, clone the ``pauli-prop`` repository.
 
 .. code:: sh
 
@@ -49,9 +46,9 @@ for instructions on installing the toolchain.
     pip install --upgrade pip
     cd pauli-prop
 
-The next step is to install ``pauli-prop`` to the virtual environment. If you plan on running the notebooks, install the
-notebook dependencies in order to run all the visualizations in the notebooks. If you plan on developing in the repository, you
-may want to install the ``dev`` dependencies.
+The next step is to install ``pauli-prop`` to the virtual environment. Install the
+notebook dependencies if you want to run all the visualizations in the notebooks. If you plan on developing in the repository, you
+can install the ``dev`` dependencies.
 
 Adjust the options below to suit your needs.
 
