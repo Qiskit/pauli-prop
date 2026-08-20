@@ -96,15 +96,23 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
         qargs = [circuit.find_bit(qubit).index for qubit in circ_inst.qubits]
         if circ_inst.name in KNOWN_CLIFFS:
             net_clifford = net_clifford.dot(circ_inst.operation, qargs)
-        elif circ_inst.name in _ROTATION_TO_GENERATOR:
-            # Pauli rotation gate:
-            pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+        elif circ_inst.name in _ROTATION_TO_GENERATOR or circ_inst.name == "PauliEvolution":
+            if circ_inst.name in _ROTATION_TO_GENERATOR:
+                # Pauli rotation gate:
+                pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+                pauli_evo_angle = circ_inst.params[0] / 2
+            else:
+                # PauliEvolutionGate:
+                operator = circ_inst.operation.operator
+                assert len(operator.paulis) == 1
+                pauli = operator.paulis[0]
+                # Fold the (real) coefficient of the term into the evolution time
+                pauli_evo_angle = circ_inst.params[0] * operator.coeffs[0].real
             # Expand to full width of the circuit:
             pauli = id_pauli.dot(pauli, qargs=qargs)
             # Evolve by all subsequent Cliffords:
             # For large circuits, faster to evolve by net_clifford than by individual gates
             pauli = pauli.evolve(net_clifford, frame="s")
-            pauli_evo_angle = circ_inst.params[0] / 2
             if pauli.phase == 2:
                 pauli_evo_angle *= -1
                 pauli.phase = 0
@@ -115,8 +123,6 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
             # Collect in non_cliffords circuit as Pauli rotation
             peg = PauliEvolutionGate(pauli, pauli_evo_angle)
             non_cliffords.append(peg, qargs=support, copy=False)
-        elif circ_inst.name == "PauliEvolution":
-            non_cliffords.append(circ_inst, copy=True)
         elif circ_inst.name == "quantum_channel" and hasattr(circ_inst.operation, "_quantum_error"):
             # Pauli-Lindblad channel:
             error = circ_inst.operation._quantum_error
@@ -182,9 +188,11 @@ class RotationGates(NamedTuple):
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
-            assert len(inst.operation.operator.paulis) == 1
-            rotation_pauli = inst.operation.operator.paulis[0]
-            theta *= 2.0
+            operator = inst.operation.operator
+            assert len(operator.paulis) == 1
+            rotation_pauli = operator.paulis[0]
+            # Fold the (real) coefficient of the term into the rotation angle
+            theta *= 2.0 * operator.coeffs[0].real
 
         rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
 
@@ -306,9 +314,11 @@ class NoisyRotationGates(NamedTuple):
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
-            assert len(inst.operation.operator.paulis) == 1
-            rotation_pauli = inst.operation.operator.paulis[0]
-            theta *= 2.0
+            operator = inst.operation.operator
+            assert len(operator.paulis) == 1
+            rotation_pauli = operator.paulis[0]
+            # Fold the (real) coefficient of the term into the rotation angle
+            theta *= 2.0 * operator.coeffs[0].real
 
         rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
 

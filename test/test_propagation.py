@@ -28,8 +28,8 @@ from pauli_prop import (
     propagate_through_rotation_gates,
 )
 from qiskit.circuit import QuantumCircuit
-from qiskit.circuit.library import RZZGate
-from qiskit.quantum_info import Clifford, Operator, PauliList, SparsePauliOp
+from qiskit.circuit.library import PauliEvolutionGate, RZZGate
+from qiskit.quantum_info import Clifford, Operator, Pauli, PauliList, SparsePauliOp
 
 
 def _pauli_dict(op: SparsePauliOp) -> dict[str, complex]:
@@ -74,8 +74,10 @@ class TestPropagation(unittest.TestCase):
         circuit.h(0)
         circuit.cx(0, 1)
         circuit.ry(math.pi / 3, 0)
+        circuit.append(PauliEvolutionGate(Pauli("Y"), 0.37), [1])
         circuit.ry(-math.pi / 6, 1)
         circuit.dcx(0, 1)
+        circuit.append(PauliEvolutionGate(SparsePauliOp(["XZ"], coeffs=[-0.5]), 0.29), [0, 1])
         circuit.sdg(0)
         circuit.barrier(0, 1)
         circuit.h([0, 1])
@@ -85,7 +87,7 @@ class TestPropagation(unittest.TestCase):
 
         for frame in ["s", "h"]:
             evolved, trunc_norm = propagate_through_circuit(
-                operator, circuit, max_terms=8, atol=1e-12, frame=frame
+                operator, circuit, max_terms=16, atol=1e-12, frame=frame
             )
             if frame == "s":
                 expected_matrix = unitary @ operator.to_matrix() @ unitary.conj().T
