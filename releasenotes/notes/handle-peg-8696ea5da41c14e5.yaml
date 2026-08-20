@@ -1,4 +1,7 @@
 ---
 fixes:
   - |
-    ``PauliEvolutionGate`` is now correctly handled is :func:`pauli_prop.propagation.evolve_through_cliffords`_.
+    ``PauliEvolutionGate`` instructions are now evolved through Clifford gates in
+    :func:`evolve_through_cliffords`, and the coefficient of the gate's Pauli term
+    is now folded into the rotation angle during propagation. Previously, these
+    gates were passed through unchanged.
