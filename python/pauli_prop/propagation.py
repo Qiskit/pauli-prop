@@ -498,7 +498,7 @@ def propagate_through_circuit(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
-    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate'), standard Clifford gates, and Pauli-Lindblad
     error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
@@ -520,6 +520,12 @@ def propagate_through_circuit(
         This function pre-allocates space in memory for the full-sized operator and operator buffer. It is the caller's
         responsibility to ensure they have enough memory to hold operators containing ``max_terms`` terms. When ``max_terms`` is
         ``None``, the memory and time requirements typically grow exponentially with the number of operations in the circuit.
+
+    .. note::
+        This function first calls ``evolve_through_cliffords`` to process all Clifford gates in the circuit. In use cases that call
+        ``propagate_through_circuit`` repeatedly, e.g. for multiple operators or for multiple values of a parameterized circuit, it
+        may save time to process the Clifford gates just once using ``evolve_through_cliffords`` in advance, and passing the result
+        to ``propagate_through_circuit``. Note the operator will need to be evolved through the resulting ``Clifford`` as well.
 
     Args:
         operator: The operator to propagate
