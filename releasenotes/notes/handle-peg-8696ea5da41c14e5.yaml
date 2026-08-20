@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    ``PauliEvolutionGate`` is now correctly handled is :func:`pauli_prop.propagation.evolve_through_cliffords`_.

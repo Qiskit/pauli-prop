@@ -67,7 +67,7 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
     r"""Evolve (Schrödinger frame) all non-Clifford instructions through all Clifford gates in the circuit.
 
     This shifts all recognized Clifford gates to the beginning of the circuit and updates the bases of
-    Pauli-rotation gates (e.g. ``RxGate``, ``RzzGate``, ``PauliEvolutionGate``) and `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_
+    Pauli-rotation gates (e.g. ``RxGate``, ``RzzGate``, single-term ``PauliEvolutionGate``) and `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_
     channels. Other operations are not supported. See `Pauli.evolve docs <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.quantum_info.Pauli#evolve>`_ for more info about evolution
     of Paulis by Cliffords.
 
@@ -86,6 +86,7 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
 
     Raises:
         ValueError: Input circuit contains unsupported gate
+        ValueError: Input circuit contains a ``PauliEvolutionGate`` with more than one Pauli term
     """
     id_pauli = Pauli("I" * circuit.num_qubits)
     net_clifford = Clifford.from_label("I" * circuit.num_qubits)
@@ -96,15 +97,27 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
         qargs = [circuit.find_bit(qubit).index for qubit in circ_inst.qubits]
         if circ_inst.name in KNOWN_CLIFFS:
             net_clifford = net_clifford.dot(circ_inst.operation, qargs)
-        elif circ_inst.name in _ROTATION_TO_GENERATOR:
-            # Pauli rotation gate:
-            pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+        elif circ_inst.name in _ROTATION_TO_GENERATOR or circ_inst.name == "PauliEvolution":
+            if circ_inst.name in _ROTATION_TO_GENERATOR:
+                # Pauli rotation gate:
+                pauli = _ROTATION_TO_GENERATOR[circ_inst.name]
+                pauli_evo_angle = circ_inst.params[0] / 2
+            else:
+                # PauliEvolutionGate:
+                operator = circ_inst.operation.operator
+                if isinstance(operator, list) or len(operator.paulis) != 1:
+                    raise ValueError(
+                        "Only single-term PauliEvolutionGates are supported "
+                        f"(circuit data idx {len(circuit) - (i + 1)})."
+                    )
+                pauli = operator.paulis[0]
+                # Fold the (real) coefficient of the term into the evolution time
+                pauli_evo_angle = circ_inst.params[0] * operator.coeffs[0].real
             # Expand to full width of the circuit:
             pauli = id_pauli.dot(pauli, qargs=qargs)
             # Evolve by all subsequent Cliffords:
             # For large circuits, faster to evolve by net_clifford than by individual gates
             pauli = pauli.evolve(net_clifford, frame="s")
-            pauli_evo_angle = circ_inst.params[0] / 2
             if pauli.phase == 2:
                 pauli_evo_angle *= -1
                 pauli.phase = 0
@@ -136,7 +149,7 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
 class RotationGates(NamedTuple):
     """An intermediate minimal representation of a :class:`.QuantumCircuit`.
 
-    Supported Pauli rotations: `rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`
+    Supported Pauli rotations: `rx/rxx`, `ry/ryy`, `rz/rzz`, single-term `PauliEvolutionGate`
     """
 
     gates: list[npt.NDArray[np.bool_]]
@@ -165,6 +178,7 @@ class RotationGates(NamedTuple):
 
         Raises:
             ValueError: Unsupported gate encountered in circuit
+            ValueError: ``inst`` is a ``PauliEvolutionGate`` with more than one Pauli term
             ValueError: If given, ``clifford`` must act on all qubits in circuit
         """
         if (clifford is not None) and (clifford.num_qubits != num_qubits):
@@ -182,9 +196,12 @@ class RotationGates(NamedTuple):
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
-            assert len(inst.operation.operator.paulis) == 1
-            rotation_pauli = inst.operation.operator.paulis[0]
-            theta *= 2.0
+            operator = inst.operation.operator
+            if isinstance(operator, list) or len(operator.paulis) != 1:
+                raise ValueError("Only single-term PauliEvolutionGates are supported.")
+            rotation_pauli = operator.paulis[0]
+            # Fold the (real) coefficient of the term into the rotation angle
+            theta *= 2.0 * operator.coeffs[0].real
 
         rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
 
@@ -207,7 +224,7 @@ class RotationGates(NamedTuple):
 class NoisyRotationGates(NamedTuple):
     """An intermediate minimal representation of a :class:`.QuantumCircuit`.
 
-    This class describes circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and Pauli-Lindblad
+    This class describes circuits containing Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, single-term `PauliEvolutionGate`) and Pauli-Lindblad
     error specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     The Pauli rotations are specified by fields ``gates``, ``qargs``, and ``thetas``. The Pauli-Lindblad error instructions are specified as ``generators`` and
@@ -242,7 +259,7 @@ class NoisyRotationGates(NamedTuple):
     ) -> None:
         """Parses a circuit instruction and appends its data to the internal lists.
 
-        Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+        Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', single-term 'PauliEvolutionGate') and Pauli-Lindblad
         error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
         Args:
@@ -254,6 +271,7 @@ class NoisyRotationGates(NamedTuple):
 
         Raises:
             ValueError: Unsupported gate encountered in circuit
+            ValueError: ``inst`` is a ``PauliEvolutionGate`` with more than one Pauli term
             ValueError: If given, ``clifford`` must act on all qubits in circuit
         """
         if (clifford is not None) and (clifford.num_qubits != num_qubits):
@@ -306,9 +324,12 @@ class NoisyRotationGates(NamedTuple):
             assert len(rotation_pauli) == 1
             rotation_pauli = rotation_pauli[0]
         else:
-            assert len(inst.operation.operator.paulis) == 1
-            rotation_pauli = inst.operation.operator.paulis[0]
-            theta *= 2.0
+            operator = inst.operation.operator
+            if isinstance(operator, list) or len(operator.paulis) != 1:
+                raise ValueError("Only single-term PauliEvolutionGates are supported.")
+            rotation_pauli = operator.paulis[0]
+            # Fold the (real) coefficient of the term into the rotation angle
+            theta *= 2.0 * operator.coeffs[0].real
 
         rotation_pauli = rotation_pauli.apply_layout(qargs, num_qubits=num_qubits)
 
@@ -336,11 +357,11 @@ def circuit_to_rotation_gates(
 ) -> RotationGates | NoisyRotationGates:
     """Converts the provided circuit to an intermediate representation.
 
-    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate') and Pauli-Lindblad
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', single-term 'PauliEvolutionGate') and Pauli-Lindblad
     error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     Args:
-        circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, `PauliEvolutionGate`) and optionally
+        circuit: The circuit to convert. May contain Pauli rotations (`rx/rxx`, `ry/ryy`, `rz/rzz`, single-term `PauliEvolutionGate`) and optionally
             `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     Returns:
@@ -498,7 +519,11 @@ def propagate_through_circuit(
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
+<<<<<<< Updated upstream
     Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', 'PauliEvolutionGate'), standard Clifford gates, and Pauli-Lindblad
+=======
+    Supports Pauli rotation gates ('rx/rxx', 'ry/ryy', 'rz/rzz', single-term 'PauliEvolutionGate'), standard Clifford gates, and Pauli-Lindblad
+>>>>>>> Stashed changes
     error channels, specified as `PauliLindbladError <https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.noise.PauliLindbladError.html#qiskit_aer.noise.PauliLindbladError>`_ instructions.
 
     For Schrödinger propagation: :math:`U O U^{\dagger}`. For Heisenberg propagation: :math:`U^{\dagger} O U`.
