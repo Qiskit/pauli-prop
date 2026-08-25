@@ -103,7 +103,7 @@ def _evolve_by_clifford(
         cliff_plist = PauliList.from_symplectic(
             z=clifford.z[rows], x=clifford.x[rows], phase=2 * clifford.phase[rows]
         )
-        for row, cliff_pauli in zip(rows, cliff_plist):
+        for row, cliff_pauli in zip(rows, cliff_plist, strict=True):
             idx_ = pauli_xz[:, row]
             if np.sum(idx_) == num_paulis:
                 ret.compose(cliff_pauli, qargs=qargs, inplace=True)
