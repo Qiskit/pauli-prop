@@ -63,6 +63,55 @@ def _commutation_matrix(pl1: PauliList, pl2: PauliList, negate=False):
     return a_dot_b == b_dot_a
 
 
+def _evolve_by_clifford(
+    pauli: Pauli | PauliList,
+    clifford: Clifford,
+    qargs: list[int] | None = None,
+    frame: str = "h",
+) -> Pauli | PauliList:
+    r"""Faster version of :meth:`qiskit.quantum_info.Pauli.evolve` when the operand is a Clifford.
+
+    When evolving by an ``n`` qubit Clifford, Qiskit evolve methods iterate all ``2n`` rows of the Clifford tableau, which
+    is wasteful when the input is non-identity on only a subset of the qubits. Here we iterate only the tableau rows selected by the input operator's support.
+
+    Args:
+        pauli: The :class:`~qiskit.quantum_info.Pauli` or :class:`~qiskit.quantum_info.PauliList`
+            to evolve.
+        clifford: The Clifford to evolve by.
+        qargs: The ``pauli`` qubits that ``clifford`` acts on. If ``None``, ``clifford`` acts on
+            all qubits and must have the same width as ``pauli``.
+        frame: ``'h'`` for Heisenberg (:math:`C^\dagger P C`) or ``'s'`` for Schrödinger
+            (:math:`C P C^\dagger`) evolution.
+
+    Returns:
+        The evolved Pauli or PauliList.
+    """
+    clifford = clifford if frame == "s" else clifford.adjoint()
+    cols = slice(None) if qargs is None else list(qargs)
+    num_paulis = pauli._x.shape[0]
+
+    ret = pauli.copy()
+    ret._x[:, cols] = False
+    ret._z[:, cols] = False
+
+    # A set x or z symplectic bit selects a tableau row to compose in. x on Clifford qubit j
+    # selects destabilizer row j; z on qubit j selects stabilizer row (num_qubits + j).
+    pauli_xz = np.concatenate((pauli._x[:, cols], pauli._z[:, cols]), axis=1)
+    # Only the tableau rows selected by at least one input Pauli contribute; skip the rest.
+    rows = np.nonzero(pauli_xz.any(axis=0))[0]
+    if len(rows):
+        cliff_plist = PauliList.from_symplectic(
+            z=clifford.z[rows], x=clifford.x[rows], phase=2 * clifford.phase[rows]
+        )
+        for row, cliff_pauli in zip(rows, cliff_plist):
+            idx_ = pauli_xz[:, row]
+            if np.sum(idx_) == num_paulis:
+                ret.compose(cliff_pauli, qargs=qargs, inplace=True)
+            else:
+                ret[idx_] = ret[idx_].compose(cliff_pauli, qargs=qargs)
+    return ret
+
+
 def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, QuantumCircuit]:
     r"""Evolve (Schrödinger frame) all non-Clifford instructions through all Clifford gates in the circuit.
 
@@ -112,7 +161,7 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
             pauli = id_pauli.dot(pauli, qargs=qargs)
             # Evolve by all subsequent Cliffords:
             # For large circuits, faster to evolve by net_clifford than by individual gates
-            pauli = pauli.evolve(net_clifford, frame="s")
+            pauli = _evolve_by_clifford(pauli, net_clifford, frame="s")
             if pauli.phase == 2:
                 pauli_evo_angle *= -1
                 pauli.phase = 0
@@ -130,7 +179,9 @@ def evolve_through_cliffords(circuit: QuantumCircuit) -> tuple[Clifford, Quantum
             generators = PauliList([id_pauli] * len(error.generators))
             generators.dot(error.generators, qargs=qargs, inplace=True)
             # Evolve by all subsequent Cliffords:
-            ple = PauliLindbladError(generators.evolve(net_clifford, frame="s"), error.rates)
+            ple = PauliLindbladError(
+                _evolve_by_clifford(generators, net_clifford, frame="s"), error.rates
+            )
             non_cliffords.append(ple, qargs=range(circuit.num_qubits), copy=False)
         else:
             raise ValueError(
