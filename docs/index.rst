@@ -6,7 +6,7 @@ The ``pauli-prop`` package provides a Rust-accelerated Python interface for perf
 
 Pauli propagation is a framework for approximating the evolution of operators in the Pauli basis under the action of other operators, such as quantum circuit gates and noise channels. This approach can be effective when the operators involved are expected to remain sparse in the Pauli basis.
 
-The subroutines in this package may be used to implement error mitigation techniques such as `lightcone shading <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-slc>`_ `[6] <ref6_>`_ and `propagated noise absorption <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-pna>`_ `[7] <ref7_>`_, `operator backpropagation <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-obp>`_ `[8] <ref8_>`_ for circuit depth reduction, and classical simulation of expectation values `[1-5] <references_>`_.
+The subroutines in this package may be used to implement error mitigation techniques such as `lightcone shading <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-slc>`_ `[6] <ref6_>`_, `propagated noise absorption <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-pna>`_ `[7] <ref7_>`_, `operator backpropagation <https://quantum.cloud.ibm.com/docs/addons/qiskit-addon-obp>`_ `[8] <ref8_>`_ for circuit depth reduction, and classical simulation of expectation values `[1-5] <references_>`_.
 
 Getting started
 ---------------
