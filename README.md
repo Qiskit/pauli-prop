@@ -7,7 +7,7 @@ under the action of other operators, such as quantum circuit gates and noise cha
 This approach can be effective when the operators involved are expected to remain sparse in the
 Pauli basis.
 
-The subroutines in this package may be used to implement error mitigation techniques such as [lightcone shading](https://github.com/Qiskit/qiskit-addon-slc) [[6]](#references) and [propagated noise absorption](https://github.com/Qiskit/qiskit-addon-pna) [[7]](#references), [operator backpropagation](https://github.com/Qiskit/qiskit-addon-obp) [[8]](#references) for circuit depth reduction, and classical simulation of expectation values [[1-5]](#references).
+The subroutines in this package may be used to implement error mitigation techniques such as [lightcone shading](https://github.com/Qiskit/qiskit-addon-slc) [[6]](#references), [propagated noise absorption](https://github.com/Qiskit/qiskit-addon-pna) [[7]](#references), [operator backpropagation](https://github.com/Qiskit/qiskit-addon-obp) [[8]](#references) for circuit depth reduction, and classical simulation of expectation values [[1-5]](#references).
 
 ----------------------------------------------------------------------------------------------------
 
