@@ -202,4 +202,7 @@ def linkcode_resolve(domain, info):
     else:
         ending_lineno = lineno + len(source) - 1
         linespec = f"#L{lineno}-L{ending_lineno}"
-    return f"https://github.com/Qiskit/pauli-prop/tree/{GITHUB_BRANCH}/pauli_prop/{file_name}{linespec}"
+    return (
+        f"https://github.com/Qiskit/pauli-prop/tree/{GITHUB_BRANCH}"
+        f"/python/pauli_prop/{file_name}{linespec}"
+    )
