@@ -653,24 +653,18 @@ def propagate_through_operator(
         if max_terms < 1:
             raise ValueError("max_terms must be a positive integer or None")
         # sort terms of each operator (descending by magnitude):
-        ordering = np.argsort(np.abs(op1.coeffs))[::-1]
-        to_evolve = SparsePauliOp(
-            op1.paulis[ordering], op1.coeffs[ordering], ignore_pauli_phase=True, copy=False
-        )
-        ordering = np.argsort(np.abs(op2.coeffs))[::-1]
-        other = SparsePauliOp(
-            op2.paulis[ordering], op2.coeffs[ordering], ignore_pauli_phase=True, copy=False
-        )
+        ordering1 = np.argsort(np.abs(op1.coeffs))[::-1]
+        ordering2 = np.argsort(np.abs(op2.coeffs))[::-1]
 
         kept_idx = _k_largest_products(
-            np.array(to_evolve.coeffs[::search_step]),
-            np.array(other.coeffs[::search_step]),
+            np.array(op1.coeffs[ordering1[::search_step]]),
+            np.array(op2.coeffs[ordering2[::search_step]]),
             max(1, max_terms // (search_step**3)),
             assume_op1_hermitian=True,
         )
         if search_step != 1:
             off_diag = kept_idx[:, 0] != kept_idx[:, 2]
-            boundaries = np.array((len(other), len(to_evolve), len(other)))
+            boundaries = np.array((len(op2), len(op1), len(op2)))
             coarse_grain_shape = (search_step, search_step, search_step)
             kept_idx *= search_step
             cube = np.indices(coarse_grain_shape).reshape(3, -1).T
@@ -693,10 +687,12 @@ def propagate_through_operator(
             kept_idx = kept_idx[np.logical_or(off_diag, kept_idx[:, 1] > num_leads - 1)]
 
         a_idx, b_idx, c_idx = kept_idx.T
-        paulis_each_term = other.paulis[a_idx] @ to_evolve.paulis[b_idx] @ other.paulis[c_idx]
-        coeffs_each_term = (
-            other.coeffs[a_idx] * to_evolve.coeffs[b_idx] * other.coeffs[c_idx].conjugate()
-        )
+        # map sorted positions back to original operator indices
+        a_orig = ordering2[a_idx]
+        b_orig = ordering1[b_idx]
+        c_orig = ordering2[c_idx]
+        paulis_each_term = op2.paulis[a_orig] @ op1.paulis[b_orig] @ op2.paulis[c_orig]
+        coeffs_each_term = op2.coeffs[a_orig] * op1.coeffs[b_orig] * op2.coeffs[c_orig].conjugate()
 
         product = SparsePauliOp(
             paulis_each_term, coeffs_each_term, ignore_pauli_phase=False, copy=False
@@ -707,15 +703,14 @@ def propagate_through_operator(
 
         if num_leads > 0:
             # now apply all with the faster method:
-            other_mags = np.abs(other.coeffs) ** 2
-            anticomm_matrix = _commutation_matrix(
-                to_evolve.paulis[:num_leads], other.paulis, negate=True
-            )
+            lead = ordering1[:num_leads]
+            op2_mags = np.abs(op2.coeffs) ** 2
+            anticomm_matrix = _commutation_matrix(op1.paulis[lead], op2.paulis, negate=True)
             anticomm_matrix = (-1) ** anticomm_matrix
-            net_coeffs = anticomm_matrix @ other_mags
+            net_coeffs = anticomm_matrix @ op2_mags
             product += SparsePauliOp(
-                to_evolve.paulis[:num_leads],
-                to_evolve.coeffs[:num_leads] * net_coeffs,
+                op1.paulis[lead],
+                op1.coeffs[lead] * net_coeffs,
                 copy=False,
                 ignore_pauli_phase=True,
             )
