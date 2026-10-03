@@ -14,7 +14,7 @@
 """Functions for performing Pauli propagation."""
 
 import warnings
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -390,6 +390,7 @@ def propagate_through_rotation_gates(
     max_terms: int,
     atol: float,
     frame: str,
+    norm: Literal['l1', 'l2'] = 'l1',
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit (represented in ``rot_gates``), :math:`U`.
 
@@ -430,6 +431,7 @@ def propagate_through_rotation_gates(
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
+        ValueError: ``norm`` is neither ``l1`` nor ``l2``.
     """
     if max_terms < 1:
         raise ValueError("max_terms must be a positive integer.")
@@ -441,6 +443,8 @@ def propagate_through_rotation_gates(
         return operator.copy(), 0.0
     if frame not in ["h", "s"]:
         raise ValueError(f"frame must be 'h' or 's', not {frame}.")
+    if norm not in ["l1", "l2"]:
+        raise ValueError(f"norm must be 'l1' or 'l2', not {norm}.")
 
     operator = operator.simplify(atol=atol)
     pauli_arr = np.concatenate([operator.paulis.x, operator.paulis.z], axis=1)
@@ -505,6 +509,7 @@ def propagate_through_circuit(
     max_terms: int,
     atol: float,
     frame: str,
+    norm: Literal['l1', 'l2'] = 'l1',
 ) -> tuple[SparsePauliOp, float]:
     r"""Propagate a sparse Pauli operator, :math:`O`, through a circuit, :math:`U`.
 
@@ -554,6 +559,7 @@ def propagate_through_circuit(
         ValueError: ``frame`` is neither ``h`` nor ``s``.
         ValueError: ``atol`` is negative.
         ValueError: ``max_terms`` is not positive.
+        ValueError: ``norm`` is neither ``l1`` nor ``l2``.
     """
     clifford_prefix, circuit_new = evolve_through_cliffords(circuit)
     if frame == "s":
@@ -562,9 +568,12 @@ def propagate_through_circuit(
             paulis, operator.coeffs.copy(), copy=False, ignore_pauli_phase=False
         )
     rot_gates = circuit_to_rotation_gates(circuit_new)
-    operator, trunc_onenorm = propagate_through_rotation_gates(
-        operator, rot_gates, max_terms, atol, frame
+    if norm not in ["l1", "l2"]:
+        raise ValueError(f"norm must be 'l1' or 'l2', not {norm}.")
+    operator, trunc_norm = propagate_through_rotation_gates(
+        operator, rot_gates, max_terms, atol, frame, norm
     )
+    trunc_onenorm = trunc_norm
     if frame == "h":
         paulis = operator.paulis.evolve(clifford_prefix, frame="h")
         operator = SparsePauliOp(
@@ -582,6 +591,7 @@ def propagate_through_operator(
     frame: str = "s",
     atol: float = 0.0,
     search_step: int = 4,
+    norm: Literal['l1', 'l2'] = 'l1',
 ) -> SparsePauliOp:
     r"""Propagate an operator, `op1` or :math:`O`, through another operator, `op2` or :math:`U`.
 
@@ -647,6 +657,8 @@ def propagate_through_operator(
         raise ValueError(f"Expected frame either 's' or 'h', but got: {frame}")
     if search_step < 1:
         raise ValueError("search_step must be a positive integer.")
+    if norm not in ["l1", "l2"]:
+        raise ValueError(f"norm must be 'l1' or 'l2', not {norm}.")
 
     num_leads = min(num_leading_terms, len(op1))
     if max_terms is not None:
