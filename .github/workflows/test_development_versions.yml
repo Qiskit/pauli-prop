@@ -67,7 +67,8 @@ jobs:
           "qiskit @ file:$(realpath qiskit/dist/*.whl)"
           "qiskit-ibm-runtime @ file:$(realpath qiskit-ibm-runtime/dist/*.whl)"
           "qiskit-addon-utils @ file:$(realpath qiskit-addon-utils/dist/*.whl)"
-      - name: Install Graphviz
+      - name: Install Graphviz (Ubuntu)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y graphviz libgvplugin-neato-layout8
