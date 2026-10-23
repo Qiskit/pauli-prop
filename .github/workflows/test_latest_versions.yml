@@ -40,7 +40,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y graphviz
+          sudo apt-get install -y graphviz libgvplugin-neato-layout8
       - name: Install Graphviz (macOS)
         if: runner.os == 'macOS'
         run: brew install graphviz
